@@ -255,7 +255,8 @@ byte IMU42688::Update() {
     if(AngleStdShow[1] >  90.0f){AngleStdShow[1] = AngleStdShow[1] - 180.0f;}
     if(AngleStdShow[1] < -90.0f){AngleStdShow[1] = AngleStdShow[1] + 180.0f;}
     AngleUserShow[1] = fabs(AngleStdShow[1]);
-    manage.set_angle_live(roundToZeroOrFive(AngleUserShow[1],2),1);
+    // manage.set_angle_live(roundToZeroOrFive(AngleUserShow[1],2),1);
+    manage.set_angle_live(AngleUserShow[1],1);
     ErrorCode = IMU_Update_Success;
     Have_New_Data_for_Collect = true;
 
@@ -264,7 +265,7 @@ byte IMU42688::Update() {
     // and print them together to save the Serial,print time consume
     break;//读取成功，用于强行结束循环并退出循环，不执行循环中剩余的语句
     NextLoop:
-     ESP_LOGE("USER","IMU_ERROR:NextLoop");
+    //  ESP_LOGE("USER","IMU_ERROR:NextLoop");
     break;   
   }
   // Action 2: Initialize sensor temperature relative value
@@ -940,8 +941,8 @@ int IMU42688::processMeasureFSM() {
     measure_count++;
     manage.set_angle_progress(measure_count * 100 / measure_total);
     if(measure_count == measure_total){
-      manage.hold_clino(roundToZeroOrFive(measure_sum / measure_total,2),manage.clino.arrow_live);
-      // manage.set_hold_flat(manage.get_live_flat());
+      // manage.hold_clino(roundToZeroOrFive(measure_sum / measure_total,2),manage.clino.arrow_live);
+      manage.hold_clino(measure_sum / measure_total,manage.clino.arrow_live);
       onMeasureReset();
       return state = MEASURE_DONE;
     }

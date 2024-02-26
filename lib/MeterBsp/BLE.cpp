@@ -327,5 +327,6 @@ void ControlCallbacks::onWrite(BLECharacteristic *pCharacteristic){
 void DeveloperCallbacks::onWrite(BLECharacteristic *pCharacteristic){
   String value_s = pCharacteristic->getValue();
   int value_d = value_s.toInt();
+  ESP_LOGE("Developer","%d",value_d);
   ble.parseDeveloperInfo(value_d);
 }

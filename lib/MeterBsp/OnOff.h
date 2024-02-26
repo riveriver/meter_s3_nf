@@ -91,8 +91,8 @@ public:
     {
         // Check whether power off require
         // ESP_LOGE("","[Off_Clock]%d",OffClock);
-        // bool PressSleep = (OffClock == 0) ? false : (millis() - OffClock) > LP_Clock;
-        bool PressSleep = 0;
+        bool PressSleep = (OffClock == 0) ? false : (millis() - OffClock) > LP_Clock;
+        // bool PressSleep = 0;
         // bool TimeOffSleep = ((millis() - LastEdit > 10 * 60 * 1000) && millis() > 10 ^ 7);
         bool TimeOffSleep = 0;
         if (OffClock != 0)

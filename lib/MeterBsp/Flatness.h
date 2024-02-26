@@ -25,7 +25,7 @@ class Flatness
 private: 
     const bool debug_mode = 1;
     const bool Serial_Print_Param       = true;  /** @brief True if require printing the I2C scanning result in Setup.*/
-    const bool Serial_Print_Raw_Data    = false;   /** @brief True if require printing the Raw Data while Update.*/
+    const bool Serial_Print_Raw_Data    = true;   /** @brief True if require printing the Raw Data while Update.*/
     const bool Serial_Print_Distance    = false;   /** @brief True if require printing the Distance while Update.*/
     const int   Cut_Off_Voltage = 2000;/** @brief Cut-off voltage*/
     const float Cut_Off_Distance = 99.9f;/** @brief Cut-off Distance*/
@@ -35,6 +35,7 @@ private:
     const byte IIC_2_SDA = 5;
     const int  ADS_1_ADDR = 0x49;
     const int  ADS_2_ADDR = 0x49;
+    int offline_time = millis();
     
     // stores
     enum StoresError {
@@ -50,7 +51,7 @@ private:
   // HACK
     bool has_flat_cali = false;
     byte unpack_step = STEP_FRAME_HEAD;
-    char rx_sub_buffer[9];
+    char rx_sub_buffer[256];
     char rx_sub_index;
     Preferences stores;
     unsigned long action_timeout = 100;
@@ -148,6 +149,7 @@ public:
     void  unpackFromHost(unsigned char info); //unpack set zero cmd
     void  unpackFromSub(unsigned char info); // unpack sub distance
     void  parseFromSub(); // prase sub distance
+    void  Test_receiveFromSub();
     int   processMeasureFSM();
 };
 #endif

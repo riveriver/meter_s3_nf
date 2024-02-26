@@ -93,6 +93,8 @@ void Flatness::update(byte wire) {
   }
   // Calculate
   if (isUpdate[0] && isUpdate[1]) {
+    // HACK send
+    // sendToHost(distance,8);
     // Print distance data.
     if (Serial_Print_Distance) {
       String S = "[DS_Distance]";
@@ -543,7 +545,10 @@ void Flatness::unpackFromSub(unsigned char info) {
   switch (unpack_step) {
     case STEP_FRAME_HEAD:
       if (info == '<') {
+        rx_sub_buffer[rx_sub_index] = {0};
+        rx_sub_index = 0;
         unpack_step = STEP_PRASE_CMD;
+        
       }
       break;
     case STEP_PRASE_CMD:
@@ -559,14 +564,15 @@ void Flatness::unpackFromSub(unsigned char info) {
         String data_str;
         rx_sub_buffer[rx_sub_index] = '\0';
         rx_sub_index = 0;
+        offline_time = millis();
         parseFromSub();
         unpack_step = STEP_FRAME_HEAD;
       } else {
         rx_sub_buffer[rx_sub_index] = info;
         rx_sub_index++;
-        if (rx_sub_index > 9) {
+        if (rx_sub_index > 256) {
           ESP_LOGE("MCOMM", "[ERROR]rx_sub_index:%d", rx_sub_index);
-          rx_sub_index = 8;
+          rx_sub_index = 256;
         }
       }
       break;
@@ -585,6 +591,11 @@ void Flatness::parseFromSub() {
     }
     index = strtok(NULL, ",");
   }
+  String S = "[sub_distance]";
+  for (int i = 0; i < 8; i++) {
+    S += String(sub_distance[i]) + ",";
+  }
+  Serial.println(S);
 }
 
 int Flatness::processMeasureFSM() {
@@ -603,4 +614,15 @@ int Flatness::processMeasureFSM() {
     return state = MEASURE_DONE;
   }
   return state;
+}
+
+void Flatness::Test_receiveFromSub() {
+    int start_time   = millis();
+    // wait serial read all:1.serial free 2.time out 3.have new data
+    while (Serial.available() && millis() - start_time < 1000) {
+      unpackFromSub(Serial.read());
+    }
+    if( millis() - offline_time > 10000){
+      Serial.println("sub offline\n");
+    }
 }

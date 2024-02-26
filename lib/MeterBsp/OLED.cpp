@@ -336,6 +336,7 @@ void OLED::TypeSelect() {
   display.setDrawColor(1);
 }
 
+// HACK distance ==> sub_distance
 void OLED::ShowDistData() {
   display.setFont(u8g2_font_6x13B_tr);
   for (int i = 0; i < 4; i++) {
@@ -994,7 +995,6 @@ void OLED::Warning(float angle, float dist) {
   // test
   // manage.warrning_mode = 2;
   // manage.warrning_angle = 10.0f;
-  Serial.printf("warrning_angle:%f\n",manage.warrning_angle);
   uint8_t light_flag = 1;  
   if (manage.warrning_mode != 2) {
     pLED->Set(0, 0, 0, 4);
