@@ -2,28 +2,23 @@
 #define BLE_H
 #include <Arduino.h>
 #include "IMU42688.h"
-#include "Measure.h"
 #include "NimBLEDevice.h"
-// #include "RealTimeClock.h"
-#include "SLED.h"
 #include "MeterManage.h"
+#include "Flatness.h"
 
 extern Meter manage;
 
+
 struct BLEState {
-  uint8_t Address[6];        /** @brief BLE advertising address.*/
-  uint8_t isConnect = false; /** @brief Indicate BLE connection status.*/
-  uint8_t OnOff = true; /** @brief BLE connsction or advertising status control.*/
-  uint8_t Send_Info = false; /** @brief Waiting to send info.*/
-  uint8_t ExpertMode = true; /** @brief Default false. True if BLE recieve
-                                correct expert mode key.*/
+  uint8_t addr[6];        /** @brief BLE advertising address.*/
+  uint8_t is_connect = false; /** @brief Indicate BLE connection status.*/
+  uint8_t is_advertising = true; /** @brief BLE connsction or advertising status control.*/
 };
 
 class MyServerCallbacks : public BLEServerCallbacks {
 public:
-  BLEState *State;
-  int *LastEdit;
-  void onConnect(BLEServer *pServer);
+  BLEState *p_state;
+  void onConnect(BLEServer *pServer, ble_gap_conn_desc* desc);
   void onDisconnect(BLEServer *pServer);
 
 };
@@ -40,14 +35,11 @@ class DeveloperCallbacks : public BLECharacteristicCallbacks {
 
 class BLE {
  public:
-  BLEState State;
+  BLEState state;
   String AddrStr = "";
   IMU42688 *pIMU;
-  Measure *pMeasure;
-  int rx_info;
-  bool has_sync_rx;
-  int *LastEdit;
-  void Initialize(int &LastEdit, uint8_t *type);
+  Flatness *pFlat;
+  void Init();
   void Send(float *SendFloat);
   void DoSwich();
   void SendStatus(byte *Send);
@@ -56,10 +48,15 @@ class BLE {
   void SendDistance(float *SendFloat);
   void SendHome(byte *Send);
   void sendSyncInfo();
-  void parseSyncInfo();
+  void parseSyncInfo(int info);
   void parseDeveloperInfo(int info);
-  void NotifyEvent();
+  bool QuickNotifyEvent();
   void ForwardToC3(int info);
+  void ParseFlatnessCali(int info);
+  void ParseDebugMode(byte part,byte data);
+  void ParseFlatCaliCmd(int info);
+  void ParseMeterType(byte part,byte data);
+  void SlowNotifyEvent();
 
  private:
   bool DEBUG = 0;
@@ -70,10 +67,7 @@ class BLE {
   BLECharacteristic *AngleXChar;
   BLECharacteristic *AngleYChar;
   BLECharacteristic *AngleZChar;
-  BLECharacteristic *DisChar[15];
-  // BLECharacteristic *SetClkChar;
-  // BLECharacteristic *SetUniChar;
-  // BLECharacteristic *SetKeyChar;
+  BLECharacteristic *FlatChar;
   BLECharacteristic *ControlChar;
   MyServerCallbacks ServerCB;
   ControlCallbacks ControlCallback;

@@ -1,67 +1,25 @@
 #include <Arduino.h>
+#include <Ticker.h>
 #include "BLE.h"
 #include "Battery.h"
 #include "Button.h"
 #include "Flatness.h"
 #include "IMU42688.h"
-#include "Measure.h"
-#include "OLED.h"
+#include "MeterUI.h"
 #include "OnOff.h"
 #include "SLED.h"
-#include "config.h"
 #include "MeterManage.h"
 
-
-const byte IO_Button2 = 0;
-const byte IO_Battery = 1;
-const byte IO_Long_Button = 2;
-const byte IO_Button0 = 6;
-const byte IO_Button1 = 7;
-const byte IO_SCL2 = 4;
-const byte IO_SDA2 = 5;
-const byte IO_SDA1 = 8;
-const byte IO_SCL1 = 9;
-const byte IO_POGO_S_TX = 11;
-const byte IO_POGO_S_RX = 12;
-const byte IO_POGO_P_TX = 13;
-const byte IO_POGO_P_RX = 14;
-const byte IO_SPI2_DC = 15;  // MISO
-const byte IO_RFID_RST = 16;
-const byte IO_SD_CTRL = 17;
-const byte IO_EN = 18;
-const byte IO_SPI_MOSI = 19;
-const byte IO_SPI_MISO = 20;
-const byte IO_Button_LED = 21;
-const byte IO_SPI2_SDA = 35;  // MOSI
-const byte IO_SPI2_CLK = 36;
-const byte IO_11V = 37;
-const byte IO_SPI_CLK = 47;
-const byte IO_SD_CS = 48;
-const byte IO_IMU_RX = 38;
-const byte IO_IMU_TX = 39;
-#ifndef IO_LED
-#define IO_LED 40;
-#endif
-#ifndef IO_OLED_RST
-#define IO_OLED_RST 41
-#endif
-#ifndef CS1
-#define CS1 10;
-#endif
-#ifndef CS2
-#define CS2 42;
-#endif
-
 Meter manage;
-Flatness flatness;
+Flatness flat;
 IMU42688 imu;
-Measure measure;
-SLED led;
-OnOff Swich;
+OnOff on_off;
 Button But;
-OLED oled;
+MeterUI ui;
 Battery Bat;
 extern BLE ble;
+// TODO 6-->1
+Ticker timer_button[6];
 
 
 /*****************************************************************************************************/
@@ -88,90 +46,115 @@ TaskHandle_t *T_SEND;
 TaskHandle_t *T_LOOP;
 
 int IMU_Period  = 300;
-int Flat_Period = 100;
+int Flat_Period = 200;
 int SEND_Period = 300;
 int OLED_Period = 250;
 int LOOP_Period = 300;
 
 void setup() {
-  Swich.On(IO_Button0, IO_EN, led, oled);
-  oled.TurnOn(IO_11V);
-  imu.fWarmUpTime = &Swich.LastEdit;
-  imu.ExpertMode = &ble.State.ExpertMode;
+  on_off.On(IO_Button0, IO_EN, manage.led, ui);
+  ui.TurnOn();
   imu.Initialize(IO_IMU_RX, IO_IMU_TX);
-  flatness.init();
-  for(int i = 0;i < 3;i++){
-    measure.SetInput(i,&(imu.AngleUser[i]));
-    measure.SetStable(i,&(imu.AngleUser[1]));
-  }
-  measure.SetInput(3,&(flatness.Mm.Diff));
-  measure.SetStable(3,&(flatness.Mm.Diff));
+  flat.init();
   Bat.SetPin(IO_Battery);
-  Bat.Update();
-  pinMode(IO_Button_LED, OUTPUT);
-  digitalWrite(IO_Button_LED, LOW);
-  oled.pDS = &flatness;
-  oled.pMeasure = &measure;
-  oled.pIMU = &imu;
-  oled.pBatt = &manage.battery;
-  oled.pBLEState = &ble.State.Address[0];
-  oled.pLED = &led;
-  But.pDS = &flatness;
-  But.pMeasure = &measure;
+  Bat.Update_BW();
+  ui.pDS = &flat;
+  ui.pIMU = &imu;
+  ui.pBattry = &manage.battery;
+  ui.pBLEState = &ble.state.addr[0];
+  But.pDS = &flat;
   But.pIMU = &imu;
-  But.pBLEState = &ble.State.Address[0];
-  But.pSleepTime = &Swich;
+  But.pBLEState = &ble.state.addr[0];
+  But.pSleepTime = &on_off;
+  But.p_ui = &ui;
   ble.pIMU = &imu;
+  ble.pFlat = &flat;
   pinMode(IO_Button_LED, OUTPUT);
   digitalWrite(IO_Button_LED, LOW);
   while (digitalRead(IO_Button0)) {
   }
-  led.Set(0, 0, 0, 4);
-  led.Set(1, 0, 0, 4);
-  led.Update();
   manage.initMeter();
-  oled.Update();
-  xTaskCreatePinnedToCore(I2C0, "Core 1 I2C0", 16384, NULL, 4, T_I2C0, 1);
-  // xTaskCreatePinnedToCore(I2C1, "Core 1 I2C1", 16384, NULL, 4, T_I2C1, 1);
-  xTaskCreatePinnedToCore(SEND, "Core 1 SEND", 8192, NULL, 3, T_SEND, 1);
+  Bat.Update_BW();
+  ui.Update();
+  
+  #ifndef TYPE_500
+    xTaskCreatePinnedToCore(I2C0, "Core 1 I2C0", 16384, NULL, 4, T_I2C0, 1);
+  #endif
+  // xTaskCreatePinnedToCore(SEND, "Core 1 SEND", 8192, NULL, 3, T_SEND, 1);''
+  // xTaskCreatePinnedToCore(task_wifi, "Core 1 SEND", 8192, NULL, 3, T_SEND, 1);
   xTaskCreatePinnedToCore(User_Interface, "Core 0 Loop", 16384, NULL, 5, T_OLED,0);
   xTaskCreatePinnedToCore(UART, "Core 1 UART", 16384, NULL, 4, T_UART, 1);
   xTaskCreatePinnedToCore(LOOP, "Core 1 LOOP", 8192, NULL, 2, T_LOOP, 1);
   attachInterrupt(digitalPinToInterrupt(IO_Button0), ButtonPress0, CHANGE);
   attachInterrupt(digitalPinToInterrupt(IO_Button1), ButtonPress1, FALLING);
   attachInterrupt(digitalPinToInterrupt(IO_Button2), ButtonPress2, FALLING);
-  attachInterrupt(digitalPinToInterrupt(IO_Long_Button), ButtonPress3, RISING);
+#ifdef HARDWARE_3_0
+  attachInterrupt(digitalPinToInterrupt(IO_Button3), ButtonPress3, FALLING);
+  attachInterrupt(digitalPinToInterrupt(IO_Button4), ButtonPress4, FALLING);
+#endif
+  attachInterrupt(digitalPinToInterrupt(IO_Long_Button), ButtonPress5, RISING);
 }
 
 void loop() {}
 
-void ButtonPress0() {
+// TODO AllCallback in one function
+#define button_delay 3
+void Press0_TimerCallback(){
   if (!digitalRead(IO_Button0)) {
     But.Press[0] = true;
-    Swich.Off_Clock_Stop();
-    Swich.LastEdit = millis();
-    
-  } else {
-    Swich.Off_Clock_Start();
-    Swich.LastEdit = millis();
+    on_off.Off_Clock_Stop();
+    on_off.last_active = millis();
+  }else{
+    on_off.Off_Clock_Start();
+    on_off.last_active = millis();
+  }
+}
+void Press1_TimerCallback(){
+  if (digitalRead(IO_Button1)) {
+    But.Press[1] = true;
+    on_off.last_active = millis();
+  }
+}
+void Press2_TimerCallback(){
+  if (digitalRead(IO_Button2)) {
+    But.Press[2] = true;
+    on_off.last_active = millis();
+  }
+}
+void ButtonPress0() {
+  timer_button[0].once_ms(button_delay,Press0_TimerCallback);
+}
+void ButtonPress1() {
+  timer_button[1].once_ms(button_delay,Press1_TimerCallback);
+}
+void ButtonPress2() {
+  timer_button[2].once_ms(button_delay,Press2_TimerCallback);
+}
+void ButtonPress5() {
+  But.Press[5] = true;
+  on_off.last_active = millis();
+}
+#ifdef HARDWARE_3_0
+void Press3_TimerCallback(){
+  if (digitalRead(IO_Button3)) {
+    But.Press[3] = true;
+    on_off.last_active = millis();
   }
 }
 
-void ButtonPress1() {
-  But.Press[1] = true;
-  Swich.LastEdit = millis();
+void Press4_TimerCallback(){
+  if (digitalRead(IO_Button4)) {
+    But.Press[4] = true;
+    on_off.last_active = millis();
+  }
 }
-
-void ButtonPress2() {
-  But.Press[2] = true;
-  Swich.LastEdit = millis();
-}
-
 void ButtonPress3() {
-  But.Press[3] = true;
-  Swich.LastEdit = millis();
+  timer_button[3].once_ms(button_delay,Press3_TimerCallback);
 }
-
+void ButtonPress4() {
+  timer_button[4].once_ms(button_delay,Press4_TimerCallback);
+}
+#endif
 /**
  * @brief
  * @param [in] pvParameter
@@ -183,124 +166,259 @@ static void LOOP(void *pvParameter) {
     xLastWakeTime = xTaskGetTickCount();
     xWasDelayed = xTaskDelayUntil(&xLastWakeTime, LOOP_Period);
     if (!xWasDelayed && millis() > 10000){
-      ESP_LOGE("","[Warning] Task LOOP Time Out.");
+      ESP_LOGE("TASK_LOOP","Time Out!!!");
     }
     But.Update();
     digitalWrite(IO_Button_LED, But.CanMeasure());
-    Swich.Off_Clock_Check();
+    on_off.Off_Clock_Check();
+
   }
 }
 
 static void User_Interface(void *pvParameter) {
-  bool BLE_Status_Pre = false;
+
   BaseType_t xWasDelayed;
   TickType_t xLastWakeTime = xTaskGetTickCount();
   for (;;) {
     xLastWakeTime = xTaskGetTickCount();
     xWasDelayed = xTaskDelayUntil(&xLastWakeTime, OLED_Period);
-    if (BLE_Status_Pre != ble.State.isConnect) {
-      BLE_Status_Pre = ble.State.isConnect;
-      oled.Block(BLE_Status_Pre ? "Bluetooth Connect" : "Bluetooth Disconnect",5000);
-    } else if (!xWasDelayed && millis() > 10000){
-      ESP_LOGE("","[Warning] Task OLED Time Out.");
+    if (!xWasDelayed && millis() > 10000){
+      ESP_LOGE("TASK_UI","Time Out!!!");
     }
-    oled.Update();
+    ui.Update();
   }
 }
 
 static void SEND(void *pvParameter) {
 
-  ble.Initialize(Swich.LastEdit, &manage.meter_type);
-
+  ble.Init();
+  bool last_state = false;
+  unsigned long slow_sync = millis();
   BaseType_t xWasDelayed;
   TickType_t xLastWakeTime = xTaskGetTickCount();
   for (;;) {
-
-    Bat.Update_BW();
     ble.DoSwich();
-    if(ble.State.isConnect == 1){
-      // if(manage.clino.measure.state == MEASURE_DONE){
-      //   ble.SendAngle(manage.clino.angle_hold);
-      //   ble.SendFlatness(0);
-      //   manage.clino.measure.state = UPLOAD_DONE;
-      // }
-      // if(manage.flatness.measure.state == MEASURE_DONE){
-      //   ble.SendAngle(0);
-      //   ble.SendFlatness(manage.flatness.flat_hold);
-      //   manage.flatness.measure.state = UPLOAD_DONE;
-      // }
-      if(manage.measure.state == MEASURE_DONE){
-        ble.SendAngle(manage.clino.angle_hold);
-        ble.SendFlatness(manage.flatness.flat_hold);
-        manage.measure.state = UPLOAD_DONE;
-        manage.clino.measure.state = UPLOAD_DONE;
-        manage.flatness.measure.state = UPLOAD_DONE;
+    if (last_state != ble.state.is_connect) {
+      last_state = ble.state.is_connect;
+      ui.Block(last_state ? "Bluetooth Connect" : "Bluetooth Disconnect",5000);
+    } 
+
+    if(ble.state.is_connect == true && manage.measure.state == M_MEASURE_DONE){
+      byte app_home = manage.home_mode;
+      if(app_home == HOME_SLOPE_FLATNESS){
+        if(manage.auto_mode_select == HOME_AUTO_SLOPE){
+          app_home = HOME_SLOPE;
+        }else if(manage.auto_mode_select == HOME_AUTO_FLATNESS){
+          app_home = HOME_FLATNESS;
+        }
       }
-      ble.NotifyEvent();
+      ble.SendHome(&app_home);
+      ble.SendAngle(manage.clino.angle_hold);
+      ble.SendFlatness(manage.flatness.flat_hold);
+      manage.measure.state = M_UPLOAD_DONE;
+      manage.clino.measure.state = M_UPLOAD_DONE;
+      manage.flatness.measure.state = M_UPLOAD_DONE;
+      on_off.last_active = millis();
     }
     
+    if(ble.QuickNotifyEvent()){
+      on_off.last_active = millis();
+    }
+    if(millis() - slow_sync > 60000){
+      slow_sync = millis();
+      Bat.Update_BW();
+      ble.SlowNotifyEvent();
+    }
+
     xLastWakeTime = xTaskGetTickCount();
     xWasDelayed = xTaskDelayUntil(&xLastWakeTime, SEND_Period);
     if (!xWasDelayed && millis() > 10000){
-      ESP_LOGE("","[Warning] Task SEND Time Out.");
+      ESP_LOGE("TASK_SEND","Time Out!!!");
     }
   }
 }
-
 
 static void I2C0(void *pvParameter) {
   BaseType_t xWasDelayed;
   TickType_t xLastWakeTime = xTaskGetTickCount();
   for (;;) {
-    flatness.update(0);
+    flat.UpdateAllInOne();
+    switch (manage.flat_state)
+    {
+    case FLAT_CALI_ZERO:
+      // flat.CaliZero();
+      break;
+    case FLAT_CALI_COMPLETE:
+      manage.flat_state = FLAT_COMMON;
+      ui.Block("Calibrate Complete", 2000);
+      manage.page = PAGE_HOME;
+      manage.cursor = 0;
+      break;
+    case FLAT_FACTORY_ZERO:
+      // flat.CaliFactoryZero();
+      break;
+    case FLAT_FIT_10:
+      flat.doCalibration();
+      break;
+    case FLAT_FIT_5:
+      // flat.CollectSample_Average();
+      break;
+    default:
+      flat.CalculateFlatness();
+      break;
+    }
     xLastWakeTime = xTaskGetTickCount();
-    xTaskDelayUntil(&xLastWakeTime, 100);
-    flatness.update(1);
-    xLastWakeTime = xTaskGetTickCount();
-    xTaskDelayUntil(&xLastWakeTime, 100);
-    // flatness.Test_receiveFromSub();
-  }
+    xWasDelayed = xTaskDelayUntil(&xLastWakeTime, Flat_Period);
+    if (!xWasDelayed && millis() > 10000){
+      ESP_LOGE("","Task I2C0 Time Out.");
+    }  
+  } 
 }
-
-// static void I2C1(void *pvParameter) {
-//   BaseType_t xWasDelayed;
-//   TickType_t xLastWakeTime = xTaskGetTickCount();
-//   for (;;) {
-//     xLastWakeTime = xTaskGetTickCount();
-//     xWasDelayed = xTaskDelayUntil(&xLastWakeTime, 200);
-//     if (!xWasDelayed && millis() > 10000){
-//       ESP_LOGE("","[Warning] Task I2C1 Time Out.");
-//     }
-//     flatness.update(1);
-//   }
-// }
 
 static void UART(void *pvParameter) {
   BaseType_t xWasDelayed;
   TickType_t xLastWakeTime = xTaskGetTickCount();
   for (;;) {
+    /* imu update */
+    if (imu.Update() == true) {
+      switch (imu.cali_state)
+      {
+      case IMU_CALI_ZERO:
+        imu.QuickCalibrate();
+        break;
+      case IMU_COMPLETE:
+        imu.StopCali();
+        ui.Block("Calibrate Complete", 2000);
+        manage.page = PAGE_HOME;
+        manage.cursor = 0;
+        break;
+      case IMU_FACTORY_ZERO:
+        imu.CaliFactoryZero();
+        break;     
+      default:
+        manage.clino.measure.state = imu.ProcessMeasureFSM();
+        break;
+      }
+    }
+    manage.flatness.measure.state = flat.ProcessMeasureFSM();
+    if(manage.home_mode == HOME_SLOPE_FLATNESS){
+      if((manage.auto_angle > -95 && manage.auto_angle < -85) 
+      || (manage.auto_angle > 85 && manage.auto_angle < 95)){
+        manage.auto_mode_select = HOME_AUTO_SLOPE;
+      }
+      else{manage.auto_mode_select = HOME_AUTO_FLATNESS;}
+    }
+    manage.updateSystem();
+    // manage.WarningLightFSM();
     xLastWakeTime = xTaskGetTickCount();
     xWasDelayed = xTaskDelayUntil(&xLastWakeTime, IMU_Period);
     if (!xWasDelayed && millis() > 10000){
-      ESP_LOGE("","[Warning] Task UART Time Out.");
+      ESP_LOGE("TASK_UART","Time Out!!!");
     }
-    /* imu update */
-    if (imu.Update() == imu.IMU_Update_Success) {
-      measure.DataIsUpdte(0,3);
-      // imu.send_to_salve.imu_cali_step   = manage.imu_cali.step;
-      // imu.send_to_salve.imu_cali_status = manage.imu_cali.step;
-      // imu.SendTOSlave(&imu.send_to_salve);
-      if (imu.CalibrateCheck == 1){
-        imu.Calibrate();
-      }
-      if (imu.CalibrateCheck == 2)
-      {
-        oled.Block((imu.Cursor == 2) ? "Calibration Data Clear" : "Calibrate Complete", 3000);
-        imu.CalStop();
-      }
-    }    
-    manage.clino.measure.state = imu.processMeasureFSM();
-    manage.flatness.measure.state = flatness.processMeasureFSM();
-    manage.updateSystem();
   }
 }
+
+#include <WiFi.h>
+WiFiClient client;
+// 设置了设备的本地IP地址为192.168.4.61
+// 设备在网络中的唯一标识符，其他设备可以通过这个地址与之通信。
+IPAddress loIP(192, 168, 4, 61);
+// 子网掩码用于确定IP地址中哪些部分是网络地址，哪些部分是主机地址。
+// 这里设置的子网掩码255.255.255.0意味着前三个八位组（192.168.4）是网络地址，
+// 最后一个八位组（.61）是主机地址。这意味着同一子网内的所有设备的IP地址前三个八位组都相同。
+IPAddress snIP(255, 255, 255, 0);
+// 网关地址，用于确定网络中的其他设备可以通过哪个IP地址与网关通信。
+// 设备用来向其他网络发送数据包的下一跳地址。
+// 此处192.168.4.1通常是路由器的地址，所有的出站流量都会被路由到这个地址。
+IPAddress gwIP(192, 168, 4, 1);
+// Modbus TCP通信的服务器地址
+IPAddress mbTCP(192, 168, 4, 51);
+// 创建了一个监听端口6600的WiFi服务器。这意味着设备可以接收来自网络上其他设备的连接请求。
+//一旦有客户端连接，服务器就可以处理这些连接，进行数据传输
+WiFiServer server(6600); 
+
+/*********************************************************************
+*                          Modbus-TCP报文帧格式
+* |-----------------MBAP报头------------------------|-----PDU-----|
+* 读取报文：事务处理标识符[2]+协议符[2]+协议长度[2]+设备地址[1]+功能码[1]+起始地址[2]+读取数量[2] 
+* 响应报文：事务处理标识符[2]+协议符[2]+协议长度[2]+设备地址[1]+功能码[1]+数据段长度[1]+数据[n] 
+* eg. read msgs: xx xx xx xx xx 05 03 00 00 00 0A
+**********************************************************************/
+void modbusAckFsm(uint8_t* buff, int16_t buff_len)
+{
+  int pack_len;
+  int start_addr;
+  int read_num;
+  // check device address
+  if (buff[6] != 0x05)return;
+  // check cmd
+  switch (buff[7])
+  {
+    case 3:// read hold register
+      start_addr = (buff[8] << 8) + buff[9];    // register address
+      read_num = (buff[10] << 8) + buff[11];
+      // 协议数据单元（PDU）长度是指从功能码开始到数据结束的长度
+      // CMD[1] + ByteNum[2] + Data[n]
+      // buff[5] = read_num * 2 + 3;
+      uint16_t protocol_len = read_num * 2 + 3;
+      buff[5] = protocol_len & 0xFF; // 获取低8位
+      buff[4] = (protocol_len >> 8) & 0xFF; // 获取高8位
+      //HACK 数据段长度,因为Modbus/TCP软件问题，n要乘以2，正确的报文不需要乘以2   
+      buff[8] = read_num * 2;
+      // 通信包长度：MBAP报头[7] + 功能码[1] + 数据段长度[1] + 数据段[n]
+      pack_len = 9 + buff[8];
+      // 填充数据
+      if ( start_addr == 0)
+      {
+        for (int i = 0; i < buff[8]/2; i++)
+        {
+          buff[9 + (i * 2)] = 0x00;
+          buff[10 + (i * 2)] = 0xA5;
+        }
+      }
+      client.write(buff, pack_len);
+      break;  
+  }
+}
+
+uint8_t tcp_buff[64];
+static void task_wifi(void *pvParameters) {
+    // 应用网络配置
+	  if (!WiFi.config(loIP, gwIP, snIP))
+	  {
+	    Serial.println("Satation配置不成功");
+	    delay(3000);
+	  }
+	  WiFi.mode(WIFI_STA);
+    String ap_ssid = "Meter_" + String(ESP.getEfuseMac(), HEX);
+    // 启动WIFI连接
+	  WiFi.begin(ap_ssid, "1234567890");
+    // 启动服务器
+    server.begin();	
+  while(1){
+    // 检查服务器是否有可用的客户端连接
+    if (server.hasClient()) 
+    {
+      client = server.available();
+      Serial.println("client connected");
+    }	
+    // 读取并处理客户端数据
+    if ( client && client.connected())
+    {
+      int i = 0;
+      while (client.available())
+      {
+        char c = client.read();
+        tcp_buff[i] = c;
+        i++;
+      }
+      if ( i > 0 )
+      {
+        modbusAckFsm(tcp_buff, i);
+      }
+    }
+    ESP_LOGI("TASK_WIFI","WiFi.status() = %d",WiFi.status());
+    vTaskDelay(1000/portTICK_PERIOD_MS);
+  }
+}
+

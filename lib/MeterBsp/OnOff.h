@@ -1,70 +1,60 @@
 #ifndef OnOff_H
 #define OnOff_H
 #include <Arduino.h>
-#include <OLED.h>
+#include <MeterUI.h>
 #include <SLED.h>
 #include <Preferences.h>
 
 class OnOff
 {
 private:
-    const int LP_Clock = 2000;             /** @brief Time to trigger Long Press power off.*/
-    const int SH_Clock = 2000;             /** @brief Time period for showing the power off image.*/
-    int OffClock = 0;
-    OLED *pOLED;
-    SLED *pLED;
-    byte ButPin;
+    const int on_time = 1000;             /** @brief Time to trigger Long Press power off.*/
+    const int off_time = 1000;             /** @brief Time period for showing the power off image.*/
+    int off_count = 0;
+    MeterUI *p_ui;
+    SLED *p_led;
+    byte OnOffPin;
     byte EN_Pin;
 
 public:
-    int LastEdit = 0;
+    int last_active = 0;
 
     /**
      * @brief System power on procedure.
      *
-     * @param WakeUpPin Button to detect wake up.
+     * @param IO_OnOff Button to detect wake up.
      * @param IO_EN Power controll GPIO. Set high when system power on.
      * @param LED Pointer to SLED.
      * @param Bat Pointer to battery.
-     * @param oled Pointer to oled.
+     * @param ui Pointer to ui.
      */
-    void On(byte WakeUpPin, byte IO_EN, SLED &LED, OLED &oled)
+    void On(byte IO_OnOff, byte IO_EN, SLED &LED, MeterUI &ui)
     {
         // Enable VCC
-        pinMode(WakeUpPin, INPUT);
+        pinMode(IO_OnOff, INPUT);
         pinMode(IO_EN, OUTPUT);
         digitalWrite(IO_EN, HIGH);
-        // Light Up LED
-        LED.Initialize();
-        LED.Set(0, LED.W, 1, 4);
-        LED.Set(1, LED.W, 1, 4);
-        LED.Update();
+        pinMode(IO_LIGHT_GREEN,OUTPUT); 
+        digitalWrite(IO_LIGHT_GREEN,HIGH);
+        pinMode(IO_LIGHT_RED,OUTPUT); 
+        digitalWrite(IO_LIGHT_RED,HIGH);
         Serial.begin(115200);
-        // Reset OLED
-        oled.DoRST();
-        // Serial begin
-        while (millis() < LP_Clock && digitalRead(WakeUpPin))
+        while (millis() < on_time && digitalRead(IO_OnOff))
         {
             delay(100);
         }
         // If is not long press
-        if (millis() < LP_Clock)
+        if (millis() < on_time)
         {
-            // Print Error
-            Serial.println("Wake up count Failed");
-            // Turn Off VCC
+            ESP_LOGE("","If is not long press");
             digitalWrite(IO_EN, LOW);
-            // Wait for power off
             while (true){}
         }
         
-        pOLED = &oled;
-        pLED = &LED;
-        ButPin = WakeUpPin;
+        p_ui = &ui;
+        p_led = &LED;
+        OnOffPin = IO_OnOff;
         EN_Pin = IO_EN;
-        LED.Set(1, 0, 0, 4);
-        LED.Set(0, 0, 0, 4);
-        LED.Update();
     }
 
     /**
@@ -72,7 +62,7 @@ public:
      */
     void Off_Clock_Start()
     {
-        OffClock = millis();
+        off_count = millis();
     }
 
     /**
@@ -80,7 +70,7 @@ public:
      */
     void Off_Clock_Stop()
     {
-        OffClock = 0;
+        off_count = 0;
     }
 
     /**
@@ -89,62 +79,42 @@ public:
      */
     void Off_Clock_Check()
     {
-        // Check whether power off require
-        // ESP_LOGE("","[Off_Clock]%d",OffClock);
-        bool PressSleep = (OffClock == 0) ? false : (millis() - OffClock) > LP_Clock;
-        // bool PressSleep = 0;
-        // bool TimeOffSleep = ((millis() - LastEdit > 10 * 60 * 1000) && millis() > 10 ^ 7);
-        bool TimeOffSleep = 0;
-        if (OffClock != 0)
-            pLED->Set(0, pLED->W, 1, 4);
-        if (!PressSleep && !TimeOffSleep)
-            return;
-
-        // Show Power Off Command
-        if (PressSleep)
+        bool CommandSleep = (off_count == 0) ? false : (millis() - off_count) > on_time;
+        bool AutoSleep = ((millis() - last_active > manage.sleep_time * 60 * 1000) && millis() > manage.sleep_time * 60 * 1000);
+        if (!CommandSleep && !AutoSleep)return;
+        if (CommandSleep)
         {
-            pOLED->Block("Shutting Down", SH_Clock * 2);
-            Serial.println(F("Command Sleep"));
+            p_ui->Block("Shutting Down", off_time);
+            ESP_LOGE("","Command Sleep");
         }
-        else if (TimeOffSleep)
+        else if (AutoSleep)
         {
-            pOLED->Block("Auto Sleep", SH_Clock * 2);
-            Serial.println(F("Auto Sleep"));
+            p_ui->Block("Auto Sleep", 5000);
+            ESP_LOGE("","Auto Sleep");
         }
 
         // Power Off
-        if (PressSleep || TimeOffSleep)
+        if (CommandSleep || AutoSleep)
         {
-            // Turn On LED
-            pLED->Set(0, pLED->W, 1, 4);
             // Wait for Powe Off Display finish
-            int ForShow = millis();
-            while (millis() - ForShow < SH_Clock)
+            int start = millis();
+            while (millis() - start < off_time)
             {
                 // If user press button when showing time out power off, stop the power off procedure.
-                if (TimeOffSleep)
+                if (AutoSleep)
                 {
-                    if (millis() - LastEdit < SH_Clock)
+                    if (millis() - last_active < off_time)
                     {
                         manage.block_time = millis();
-                        pLED->Set(0, 0, 0, 4);
                         return;
                     }
                 }
             }
-            // Power Off Confirm
-            pOLED->TurnOff();
             // Wait for button release
-            while (digitalRead(ButPin))
-            {
-            }
-            // Let user know we had power off
-            pLED->Clear();
-            Serial.println("Sleep");
-            // Power Off
+            while (digitalRead(OnOffPin)){}
+            p_ui->TurnOff();
             digitalWrite(EN_Pin, LOW);
-            while (true)
-                ;
+            while (true){};
         }
     }
 };

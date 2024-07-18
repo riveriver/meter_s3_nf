@@ -41,10 +41,6 @@ public:
         return sum / window.size();
     }
     
-    void reset(){
-      window.clear();
-    }
-
     void push_back(T newValue) {
         window.push_back(newValue);  // 将新值加入窗口
 

@@ -2,7 +2,7 @@
 #define SLED_H
 #include <Adafruit_NeoPixel.h>
 #ifndef IO_LED
-#define IO_LED 40
+#define IO_LED 17
 #endif
 #define LED_COUNT 2
 
