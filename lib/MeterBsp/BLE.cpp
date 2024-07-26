@@ -198,7 +198,7 @@ void BLE::ParseFlatnessCali(int info) {
     ESP_LOGE("APP","cmd:%d",data);
     if(data > 13){return;}
     manage.dist_cali.step = data;
-    manage.flat_state = FLAT_FIT_10;
+    manage.flat_state = FLAT_APP_CALI;
   }else if(huns > 8){
     ESP_LOGE("APP","huns:%d > 8",huns);
   }else{
@@ -220,7 +220,7 @@ void BLE::ParseFlatCaliCmd(int info) {
     }
     if(manage.flat_height_level == -1){
       manage.flat_height_level = data;
-      manage.flat_state = FLAT_FIT_10;
+      manage.flat_state = FLAT_APP_CALI;
     }else{
       manage.SendToApp("cmd[0]:please reset or wait!");
     }
@@ -228,7 +228,7 @@ void BLE::ParseFlatCaliCmd(int info) {
   else if(huns == 9){
     manage.adjust_num = ones;      
     manage.flat_height_level = 14;
-    manage.flat_state = FLAT_FIT_10;
+    manage.flat_state = FLAT_APP_CALI;
     manage.SendToApp("single cali:" + String(ones));
   }else if(huns > 8){
     manage.SendToApp("[error]cmd:" + String(huns));

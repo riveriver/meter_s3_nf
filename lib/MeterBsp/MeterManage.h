@@ -130,8 +130,9 @@ enum FLAT_FSM_DEFINE {
     FLAT_CALI_ZERO,
     FLAT_CALI_COMPLETE,
     FLAT_FACTORY_ZERO,
-    FLAT_FIT_10,
-    FLAT_FIT_5,
+    FLAT_LCD_CALI,
+    FLAT_APP_CALI,
+    FLAT_ROBOT_ARM_CALI,
 };
 
 enum CALI_STEP{
@@ -201,7 +202,7 @@ byte meter_type = 11;
 byte meter_type = 12;
 #endif
 #ifdef FACTORY_TEST
-  byte flat_debug = 1;
+  byte flat_debug = 0;
 #else
   byte flat_debug = 0;
 #endif

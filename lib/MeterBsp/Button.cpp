@@ -282,7 +282,7 @@ switch (manage.reset_state) {
         manage.flat_state = FLAT_COMMON;
       } else if (manage.flat_state = FLAT_COMMON) {
         manage.cali_count++;
-        manage.flat_state = FLAT_FIT_10;
+        manage.flat_state = FLAT_LCD_CALI;
       }
     }
 #else  
@@ -291,7 +291,7 @@ switch (manage.reset_state) {
         manage.page = PAGE_HOME;
         manage.flat_state = FLAT_COMMON;
       } else if (manage.flat_state== FLAT_COMMON) {
-        manage.flat_state = FLAT_FIT_10;
+        manage.flat_state = FLAT_LCD_CALI;
       }
     }
 #endif

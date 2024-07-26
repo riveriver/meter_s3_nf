@@ -80,8 +80,8 @@ void setup() {
   #ifndef TYPE_500
     xTaskCreatePinnedToCore(I2C0, "Core 1 I2C0", 16384, NULL, 4, T_I2C0, 1);
   #endif
-  // xTaskCreatePinnedToCore(SEND, "Core 1 SEND", 8192, NULL, 3, T_SEND, 1);''
-  // xTaskCreatePinnedToCore(task_wifi, "Core 1 SEND", 8192, NULL, 3, T_SEND, 1);
+  xTaskCreatePinnedToCore(SEND, "Core 1 SEND", 8192, NULL, 3, T_SEND, 1);
+  // xTaskCreatePinnedToCore(commArmTask, "Core 1 SEND", 8192, NULL, 3, T_SEND, 1);
   xTaskCreatePinnedToCore(User_Interface, "Core 0 Loop", 16384, NULL, 5, T_OLED,0);
   xTaskCreatePinnedToCore(UART, "Core 1 UART", 16384, NULL, 4, T_UART, 1);
   xTaskCreatePinnedToCore(LOOP, "Core 1 LOOP", 8192, NULL, 2, T_LOOP, 1);
@@ -189,6 +189,7 @@ static void User_Interface(void *pvParameter) {
   }
 }
 
+#ifdef BLE
 static void SEND(void *pvParameter) {
 
   ble.Init();
@@ -237,7 +238,24 @@ static void SEND(void *pvParameter) {
     }
   }
 }
+#else
+uint8_t auto_cali_data[4] = {0xA5,0x01,0x03,0xF5};
+static void SEND(void *pvParameter) {
 
+  bool last_state = false;
+  unsigned long slow_sync = millis();
+  BaseType_t xWasDelayed;
+  TickType_t xLastWakeTime = xTaskGetTickCount();
+  for (;;) {
+    Serial.write(auto_cali_data, sizeof(auto_cali_data));
+    xLastWakeTime = xTaskGetTickCount();
+    xWasDelayed = xTaskDelayUntil(&xLastWakeTime, 1000);
+    if (!xWasDelayed && millis() > 10000){
+      ESP_LOGE("TASK_SEND","Time Out!!!");
+    }
+  }
+}
+#endif
 static void I2C0(void *pvParameter) {
   BaseType_t xWasDelayed;
   TickType_t xLastWakeTime = xTaskGetTickCount();
@@ -257,11 +275,8 @@ static void I2C0(void *pvParameter) {
     case FLAT_FACTORY_ZERO:
       // flat.CaliFactoryZero();
       break;
-    case FLAT_FIT_10:
-      flat.doCalibration();
-      break;
-    case FLAT_FIT_5:
-      // flat.CollectSample_Average();
+    case FLAT_APP_CALI:
+      flat.doAppCali();
       break;
     default:
       flat.CalculateFlatness();
@@ -318,107 +333,172 @@ static void UART(void *pvParameter) {
   }
 }
 
+// /*
+//   Modbus-Arduino Example - Master Modbus IP Client (ESP8266/ESP32)
+//   Read Holding Register from Server device
+
+//   (c)2018 Alexander Emelianov (a.m.emelianov@gmail.com)
+//   https://github.com/emelianov/modbus-esp8266
+// */
+
+// #include <WiFi.h>
+// #include <ModbusIP_ESP8266.h>
+
+// const int REG = 102;               // Modbus Hreg Offset
+// IPAddress remote(192, 168, 57, 2);  // Address of Modbus Slave device
+// const int LOOP_COUNT = 10;
+// uint16_t res = 5;
+// uint8_t show = LOOP_COUNT;
+// ModbusIP mb;  //ModbusIP object
+
+// static void commArmTask(void *pvParameter) {
+  
+//   WiFi.begin("Wifi-7628-15B0", "12345678");
+//   while (WiFi.status() != WL_CONNECTED) {
+//     delay(500);
+//     ESP_LOGE("", "Connecting to WiFi...");
+//   }
+//   ESP_LOGE("", "WIFI_Connecting:%c",WiFi.localIP());
+//   mb.client();
+//   BaseType_t xWasDelayed;
+//   TickType_t xLastWakeTime = xTaskGetTickCount();
+//   for (;;) {
+//     if (mb.isConnected(remote)) {   // Check if connection to Modbus Slave is established
+//       mb.readHreg(remote, REG, &res);  // Initiate Read Coil from Modbus Slave
+//     } else {
+//       mb.connect(remote);           // Try to connect if no connection
+//     }
+//     mb.task();                      // Common local Modbus task
+//     delay(100);                     // Pulling interval
+//     if (!show--) {                   // Display Slave register value one time per second (with default settings)
+//       ESP_LOGE("","res:%d",res);
+//       show = LOOP_COUNT;
+//     }
+//     xLastWakeTime = xTaskGetTickCount();
+//     xWasDelayed = xTaskDelayUntil(&xLastWakeTime, 10);
+//     if (!xWasDelayed && millis() > 10000){
+//       ESP_LOGE("commArmTask","Time Out!!!");
+//     }
+//   }
+// }
+
+
+/* esp32Modbus
+
+Copyright 2018 Bert Melis
+
+Permission is hereby granted, free of charge, to any person obtaining a
+copy of this software and associated documentation files (the
+"Software"), to deal in the Software without restriction, including
+without limitation the rights to use, copy, modify, merge, publish,
+distribute, sublicense, and/or sell copies of the Software, and to
+permit persons to whom the Software is furnished to do so, subject to
+the following conditions:
+
+The above copyright notice and this permission notice shall be included
+in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+*/
+
+
+/*
+
+The modbus server (= SMA Sunny Boy) is defined as
+ModbusTCP sunnyboy(3, {192, 168, 123, 123}, 502);
+where:
+- 3 = device ID
+- {192, 168, 123, 13} = device IP address
+- 502 = port number
+
+All defined registers are holding registers, 2 word size (4 bytes)
+
+*/
+
+
+#include <Arduino.h>
 #include <WiFi.h>
-WiFiClient client;
-// 设置了设备的本地IP地址为192.168.4.61
-// 设备在网络中的唯一标识符，其他设备可以通过这个地址与之通信。
-IPAddress loIP(192, 168, 4, 61);
-// 子网掩码用于确定IP地址中哪些部分是网络地址，哪些部分是主机地址。
-// 这里设置的子网掩码255.255.255.0意味着前三个八位组（192.168.4）是网络地址，
-// 最后一个八位组（.61）是主机地址。这意味着同一子网内的所有设备的IP地址前三个八位组都相同。
-IPAddress snIP(255, 255, 255, 0);
-// 网关地址，用于确定网络中的其他设备可以通过哪个IP地址与网关通信。
-// 设备用来向其他网络发送数据包的下一跳地址。
-// 此处192.168.4.1通常是路由器的地址，所有的出站流量都会被路由到这个地址。
-IPAddress gwIP(192, 168, 4, 1);
-// Modbus TCP通信的服务器地址
-IPAddress mbTCP(192, 168, 4, 51);
-// 创建了一个监听端口6600的WiFi服务器。这意味着设备可以接收来自网络上其他设备的连接请求。
-//一旦有客户端连接，服务器就可以处理这些连接，进行数据传输
-WiFiServer server(6600); 
+#include <esp32ModbusTCP.h>
 
-/*********************************************************************
-*                          Modbus-TCP报文帧格式
-* |-----------------MBAP报头------------------------|-----PDU-----|
-* 读取报文：事务处理标识符[2]+协议符[2]+协议长度[2]+设备地址[1]+功能码[1]+起始地址[2]+读取数量[2] 
-* 响应报文：事务处理标识符[2]+协议符[2]+协议长度[2]+设备地址[1]+功能码[1]+数据段长度[1]+数据[n] 
-* eg. read msgs: xx xx xx xx xx 05 03 00 00 00 0A
-**********************************************************************/
-void modbusAckFsm(uint8_t* buff, int16_t buff_len)
-{
-  int pack_len;
-  int start_addr;
-  int read_num;
-  // check device address
-  if (buff[6] != 0x05)return;
-  // check cmd
-  switch (buff[7])
-  {
-    case 3:// read hold register
-      start_addr = (buff[8] << 8) + buff[9];    // register address
-      read_num = (buff[10] << 8) + buff[11];
-      // 协议数据单元（PDU）长度是指从功能码开始到数据结束的长度
-      // CMD[1] + ByteNum[2] + Data[n]
-      // buff[5] = read_num * 2 + 3;
-      uint16_t protocol_len = read_num * 2 + 3;
-      buff[5] = protocol_len & 0xFF; // 获取低8位
-      buff[4] = (protocol_len >> 8) & 0xFF; // 获取高8位
-      //HACK 数据段长度,因为Modbus/TCP软件问题，n要乘以2，正确的报文不需要乘以2   
-      buff[8] = read_num * 2;
-      // 通信包长度：MBAP报头[7] + 功能码[1] + 数据段长度[1] + 数据段[n]
-      pack_len = 9 + buff[8];
-      // 填充数据
-      if ( start_addr == 0)
-      {
-        for (int i = 0; i < buff[8]/2; i++)
-        {
-          buff[9 + (i * 2)] = 0x00;
-          buff[10 + (i * 2)] = 0xA5;
-        }
-      }
-      client.write(buff, pack_len);
-      break;  
+const char* ssid = "Wifi-7628-15B0";
+const char* pass = "12345678";
+bool WiFiConnected = false;
+
+esp32ModbusTCP sunnyboy(3, {192, 168, 57, 2}, 502);
+enum smaType {
+  ENUM,   // enumeration
+  UFIX0,  // unsigned, no decimals
+  SFIX0,  // signed, no decimals
+};
+struct smaData {
+  const char* name;
+  uint16_t address;
+  uint16_t length;
+  smaType type;
+  uint16_t packetId;
+};
+smaData smaRegisters[] = {
+  "status", 30102, 2, ENUM, 0,
+};
+uint8_t numberSmaRegisters = sizeof(smaRegisters) / sizeof(smaRegisters[0]);
+uint8_t currentSmaRegister = 0;
+
+
+// void setup() {
+//     WiFi.disconnect(true);  // delete old config
+//     delay(1000);
+//     WiFi.begin(ssid, pass);
+//     Serial.println();
+//     Serial.println("Connecting to WiFi... ");
+// }
+
+// void loop() {
+//   static uint32_t lastMillis = 0;
+//   if ((millis() - lastMillis > 30000 && WiFiConnected)) {
+//     lastMillis = millis();
+//     Serial.print("reading registers\n");
+//     for (uint8_t i = 0; i < numberSmaRegisters; ++i) {
+//       uint16_t packetId = sunnyboy.readHoldingRegisters(smaRegisters[i].address, smaRegisters[i].length);
+//       if (packetId > 0) {
+//         smaRegisters[i].packetId = packetId;
+//       } else {
+//         Serial.print("reading error\n");
+//       }
+//     }
+//   }
+// }
+
+static void commArmTask(void *pvParameter) {
+
+  WiFi.disconnect(true);  // delete old config
+  delay(1000);
+  WiFi.begin("Wifi-7628-15B0", "12345678");
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    ESP_LOGE("", "Connecting to WiFi...");
   }
-}
-
-uint8_t tcp_buff[64];
-static void task_wifi(void *pvParameters) {
-    // 应用网络配置
-	  if (!WiFi.config(loIP, gwIP, snIP))
-	  {
-	    Serial.println("Satation配置不成功");
-	    delay(3000);
-	  }
-	  WiFi.mode(WIFI_STA);
-    String ap_ssid = "Meter_" + String(ESP.getEfuseMac(), HEX);
-    // 启动WIFI连接
-	  WiFi.begin(ap_ssid, "1234567890");
-    // 启动服务器
-    server.begin();	
-  while(1){
-    // 检查服务器是否有可用的客户端连接
-    if (server.hasClient()) 
-    {
-      client = server.available();
-      Serial.println("client connected");
-    }	
-    // 读取并处理客户端数据
-    if ( client && client.connected())
-    {
-      int i = 0;
-      while (client.available())
-      {
-        char c = client.read();
-        tcp_buff[i] = c;
-        i++;
-      }
-      if ( i > 0 )
-      {
-        modbusAckFsm(tcp_buff, i);
+  ESP_LOGE("", "WIFI_Connecting:%c",WiFi.localIP());
+  BaseType_t xWasDelayed;
+  TickType_t xLastWakeTime = xTaskGetTickCount();
+  for (;;) {
+  static uint32_t lastMillis = 0;
+  if ((millis() - lastMillis > 30000 && WiFiConnected)) {
+    lastMillis = millis();
+    Serial.print("reading registers\n");
+    for (uint8_t i = 0; i < numberSmaRegisters; ++i) {
+      uint16_t packetId = sunnyboy.readHoldingRegisters(smaRegisters[i].address, smaRegisters[i].length);
+      if (packetId > 0) {
+        smaRegisters[i].packetId = packetId;
+      } else {
+        Serial.print("reading error\n");
       }
     }
-    ESP_LOGI("TASK_WIFI","WiFi.status() = %d",WiFi.status());
-    vTaskDelay(1000/portTICK_PERIOD_MS);
+  }
   }
 }
-

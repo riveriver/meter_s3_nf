@@ -22,38 +22,21 @@ extern Meter manage;
 class Flatness
 {
 private: 
-#ifdef HARDWARE_0_0
-    #define ADS_NUM 8
-    #define SENSOR_NUM 4
-#elif defined(HARDWARE_1_0)
-    #define ADS_NUM 1
-    #define SENSOR_NUM 2
-#elif defined(HARDWARE_2_0)
+#ifdef SENSOR_1_2
+    #define ADS_NUM 4
+    #define SENSOR_NUM 8
+#elif defined(SENSOR_1_4)
     #define ADS_NUM 2
-    #define SENSOR_NUM 7
-#elif defined(HARDWARE_3_0)
-// #ifdef TYPE_1000
-//     #define ADS_NUM 2
-//     #define SENSOR_NUM 4
-// #elif defined(TYPE_2000)
-//     #define ADS_NUM 4
-//     #define SENSOR_NUM 8
-// #else
-//     #define ADS_NUM 4
-//     #define SENSOR_NUM 8
-// #endif
-    #define ADS_NUM 1
-    #define SENSOR_NUM 4
+    #define SENSOR_NUM 8
 #else
     #define ADS_NUM 8
     #define SENSOR_NUM 8
 #endif
-    Adafruit_ADS1115 ads1115[ADS_NUM];
+    Adafruit_ADS1115 ads1115[8];
     Preferences stores;
 public:
     Flatness(){}
     
-    bool ads_block = false;
     uint16_t  raw[8]   = {0}; /** @brief ADS1115 ADC raw value buffer.*/
     float raw_peak[8]   = {0};
     float filt_peak[8]  = {0};
@@ -110,7 +93,8 @@ void  init();
     bool  yes_no = false;
     float progress = 0;
     float cali_progress = 0; 
-    void  doCalibration();
+    void doAppCali();  
+    void doRobotArmCali();
     void getFitParams();
     void putFitParams();
 };

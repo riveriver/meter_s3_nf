@@ -757,9 +757,8 @@ void MeterUI::pageInfo(int selection) {
       for (int i = 0; i < 8; i++) {
         int x_offset = (i < 4) ? 0 : 64;
         int y_offset = 20 + (i < 4 ? i : i - 4) * 14;
-        screen_h.drawStr(x_offset, y_offset, String(pDS->dist[i],1).c_str());
-        screen_h.drawStr(x_offset + 24, y_offset,String(pDS->dist_linear[i], 1).c_str());
-        screen_h.drawStr(x_offset + 48, y_offset,String(pDS->filt_peak[i],0).c_str());
+        screen_h.drawStr(x_offset, y_offset, String(pDS->dist_linear[i],1).c_str());
+        screen_h.drawStr(x_offset + 40, y_offset,String(pDS->filt_peak[i],0).c_str());
       }
       break;
     case 1:
