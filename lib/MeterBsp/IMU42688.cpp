@@ -77,7 +77,7 @@ void IMU42688::unpackFromC3(unsigned char info){
                 manage.cali_forward_str += cali_rx_buffer[i];
               }
               // HACK
-              Serial.println(manage.cali_forward_str);
+              // Serial.println(manage.cali_forward_str);
               
               cali_rx_index = 0;
               manage.has_imu_forward = true;
@@ -343,7 +343,7 @@ void IMU42688::QuickCalibrate() {
     
     String S = "[Angle]SetZeroComplete: ";
     S += String(e[1], 2) + ",";
-    Serial.println(S);
+    // Serial.println(S);
   }
 }
 

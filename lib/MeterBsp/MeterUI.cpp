@@ -113,13 +113,13 @@ U8G2_ST7539_192X64_F_4W_SW_SPI screen_s(U8G2_R2, /*CLK*/ 12, /*SDA*/ 11,
                                         /*CS*/ 37, /*DC*/ 13, /*RST*/ 14);                
 void MeterUI::TurnOn() {
   if (!screen_h.begin()) {
-    Serial.println("screen_h failed");
+    ESP_LOGE("screen_h", "screen_h failed");
     return;
   }
   screen_h.setContrast(0x87);
 
   if (!screen_s.begin()) {
-    Serial.println("screen_s failed");
+    ESP_LOGE("screen_s", "screen_s failed");
     return;
   }
   screen_s.setContrast(0x70);
@@ -163,7 +163,7 @@ void MeterUI::Primary_DrawCommon() {
   if (*(pBLEState + 6) == true) {
     screen_h.drawXBM(39, 2, 13, 12, bitmap_bluetooth);
   }
-  if (manage.flatness.sub_online) {
+  if (manage.flat.sub_online) {
     screen_h.drawXBM(82, 2, 28, 9, bitmap_unit_2000mm);
   } else screen_h.drawXBM(82, 2, 28, 9, bitmap_unit_1000mm);
   screen_h.drawXBM(18, 54, 92, 6, bitmap_h_loading);
@@ -272,7 +272,7 @@ void MeterUI::Primary_DrawFlat() {
   screen_h.setFont(u8g2_font_6x12_mr);
   for(int i = 0; i < 8; i++){
     if(pDS->sensor_online[i]){
-      if(manage.flatness.ready[i]){
+      if(manage.flat.ready[i]){
         screen_h.setDrawColor(0);
       }
       screen_h.drawStr(37 + 7 * i, 10,String(i + 1).c_str());
@@ -291,7 +291,7 @@ void MeterUI::Primary_DrawFlatSlope() {
   if (manage.auto_mode_select == HOME_AUTO_FLATNESS) {
     // screen_h.drawXBM(5, 25, 14, 14, bitmap_flat_icon);
     screen_h.drawXBM(110, 30, 17, 15, BITMAP_UNIT_MM);
-  if (manage.flatness.sub_online) {
+  if (manage.flat.sub_online) {
     screen_h.drawXBM(82, 2, 28, 9, bitmap_unit_2000mm);
   } else screen_h.drawXBM(82, 2, 28, 9, bitmap_unit_1000mm);
     if (measure_state == M_MEASURE_DONE || measure_state == M_UPLOAD_DONE) {
@@ -352,7 +352,7 @@ void MeterUI::Minor_DrawCommon() {
     if (*(pBLEState + 6) == true) {
       screen_s.drawXBM(39, 2, 13, 12, bitmap_bluetooth);
     }
-    if (manage.flatness.sub_online) {
+    if (manage.flat.sub_online) {
       screen_s.drawXBM(82, 2, 28, 9, bitmap_unit_2000mm);
     } else screen_s.drawXBM(82, 2, 28, 9, bitmap_unit_1000mm);
     screen_s.drawXBM(18, 54, 92, 6, bitmap_h_loading);
@@ -450,7 +450,7 @@ void MeterUI::Minor_DrawFlat() {
   screen_s.setFont(u8g2_font_6x12_mr);
   for(int i = 0; i < 8; i++){
     if(pDS->sensor_online[i]){
-      if(manage.flatness.ready[i]){
+      if(manage.flat.ready[i]){
         screen_s.setDrawColor(0);
       }
       screen_s.drawStr(37 + 7 * i, 10,String(i + 1).c_str());
@@ -650,16 +650,34 @@ void MeterUI::pageCaliMenu() {
 }
 
 void MeterUI::pageAutoCaliFlatness() {
-  screen_h.setFont(u8g2_font_10x20_tr);
-  screen_h.drawStr(0, 11, "FlatCali");
-  screen_h.drawBox(0, 13, 128, 2);
-  char height_char[12][8] = {"BACK", "1mm", "2mm", "3mm", "4mm",  "5mm",
-                             "6mm",  "7mm", "8mm", "9mm", "10mm", "SAVE"};
-  screen_h.drawStr(48, 36, height_char[manage.dist_cali.step]);
-  screen_h.drawStr(5, 54, "Press:");
-  screen_h.drawStr(64, 54, String(manage.cali_count).c_str());
+  screen_h.setFont(u8g2_font_helvB10_tr);
+  screen_h.drawStr(0, 12, "Flat Robot Cali");
+  screen_h.drawBox(0, 14, 128, 2);
+  if(manage.flat.state == FLAT_ROBOT_ARM_CALI){
+    screen_h.drawStr(10,28, "Auto Cali ...");
+  }else{
+    screen_h.drawStr(10,28, "Wait For Cmd");
+  }
+  screen_h.drawStr(64,42, String(manage.flat.cali.step).c_str());
+   screen_h.drawXBM(18, 54, 92, 6, bitmap_h_loading);
+  screen_h.drawBox(19, 55, manage.flat.progress * 0.9, 3);
 }
 
+
+void MeterUI::pageRobotCaliFlatness() {
+  screen_h.setFont(u8g2_font_helvB10_tr);
+  screen_h.drawStr(0, 12, "Flat Robot Cali");
+  screen_h.drawBox(0, 14, 128, 2);
+  if(manage.flat.state == FLAT_ROBOT_ARM_CALI){
+    screen_h.drawStr(18,28, "Robot Cali...");
+  }else{
+    screen_h.drawStr(18,28, "Wait For Cmd");
+  }
+  String str = "Height: " + String(manage.flat.cali.step) + " mm";
+  screen_h.drawStr(18,42, str.c_str());
+  screen_h.drawXBM(18, 54, 92, 6, bitmap_h_loading);
+  screen_h.drawBox(19, 55, manage.flat.progress * 0.9, 3);
+}
 void MeterUI::pageOption_YesNo(bool option) {
   char S1[4] = "No";
   char S2[4] = "Yes";
@@ -706,12 +724,12 @@ void MeterUI::pageImuFactoryZero() {
 void MeterUI::pageCaliFlatCheck() {
   screen_h.setFont(u8g2_font_7x14B_tr);
   // YES_NO确认界面
-  if (manage.flat_state == FLAT_COMMON) {
+  if (manage.flat.state == FLAT_COMMON) {
     screen_h.drawStr(0, 15, "FlatCali Ready?");
     pageOption_YesNo(pDS->yes_no);
   }
   // 采集数据页面
-  else if (manage.flat_state == FLAT_CALI_ZERO) {
+  else if (manage.flat.state == FLAT_CALI_ZERO) {
     screen_h.drawStr(0, 15, "FlatCali Going!");
     screen_h.drawFrame(12, 50, 104, 14);
     screen_h.drawBox(14, 52, pDS->cali_progress, 10);
@@ -735,12 +753,12 @@ void MeterUI::pageResetFactoryZero() {
 void MeterUI::pageFlatFactoryZero() {
   screen_h.setFont(u8g2_font_7x14B_tr);
   // YES_NO确认界面
-  if (manage.flat_state == FLAT_COMMON) {
+  if (manage.flat.state == FLAT_COMMON) {
     screen_h.drawStr(0, 15, "FlatFactory Ready?");
     pageOption_YesNo(pDS->yes_no);
   }
   // 采集数据页面
-  else if (manage.flat_state == FLAT_FACTORY_ZERO) {
+  else if (manage.flat.state == FLAT_FACTORY_ZERO) {
     screen_h.drawStr(0, 15, "FlatFactory Going!");
     screen_h.drawFrame(12, 50, 104, 14);
     screen_h.drawBox(14, 52, pDS->cali_progress, 10);
@@ -1064,16 +1082,16 @@ void MeterUI::Minor_drawNum_16x24(int x, int y, String str, int size) {
 
 void MeterUI::Update() {
   // do block
-  switch(manage.flatness.online_block){
+  switch(manage.flat.online_block){
     // offline
     case 1:
       Block("SubMeter Disconnect", 2500);
-      manage.flatness.online_block = 0;
+      manage.flat.online_block = 0;
     break;
     // online
     case 2:
       Block("SubMeter Connect", 1500);
-      manage.flatness.online_block = 0;
+      manage.flat.online_block = 0;
       break;
     default:
       break;
@@ -1089,11 +1107,11 @@ void MeterUI::Update() {
   if (measure_state == M_MEASURE_DONE || measure_state == M_UPLOAD_DONE) {
     angle_show = manage.clino.angle_hold;
     slope_show = manage.clino.slope_hold;
-    flat_show = manage.flatness.flat_hold;
+    flat_show = manage.flat.flat_hold;
   } else {
     angle_show = manage.clino.angle_live;
     slope_show = manage.clino.slope_live;
-    flat_show = manage.flatness.flat_live;
+    flat_show = manage.flat.flat_live;
   }
   auto_mode_select = manage.auto_mode_select;
   dash_num = manage.dash_num;
@@ -1144,9 +1162,6 @@ void MeterUI::Update() {
       case PAGE_ZERO_RESET:
         pageResetFactoryZero();
         break;
-      case PAGE_CALI_FLAT:
-        pageAutoCaliFlatness();
-        break;
       case PAGE_LIGHT_SWITCH:
         pageSwitchLight();
         break;
@@ -1155,6 +1170,9 @@ void MeterUI::Update() {
         break;
       case PAGE_IMU_CALI_INFO:
         pageAngleCaliInfo();
+        break;
+      case PAGE_CALI_FLAT:
+        pageRobotCaliFlatness();
         break;
       case PAGE_IMU_FACTORY_ZERO:
         pageImuFactoryZero();
@@ -1169,4 +1187,12 @@ void MeterUI::Update() {
   }
   screen_h.sendBuffer();
   screen_h.clearBuffer();
+}
+
+void MeterUI::pageRobotCali() {
+  screen_h.setFont(u8g2_font_7x13B_tr);
+  screen_h.drawStr(2, 10, "RobotCali:");
+  char str[7] = "-----";
+  dtostrf(manage.flat_height_level, 7, 2, str);
+  drawNum_16x24(NUM_LHX, NUM_LHY, str, 7);
 }

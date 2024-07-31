@@ -1,6 +1,4 @@
 adafruit/Adafruit NeoPixel@^1.11.0
-bertmelis/esp32ModbusTCP@^0.0.1
-emelianov/modbus-esp8266@^4.1.0
+h2zero/NimBLE-Arduino@^1.4.1
 adafruit/Adafruit ADS1X15@^2.4.0
 olikraus/U8g2@^2.35.7
-h2zero/NimBLE-Arduino@^1.4.1

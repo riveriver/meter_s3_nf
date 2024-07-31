@@ -89,13 +89,14 @@ void  init();
 9141, 9041, 8746, 8548, 8350, 8153, 7953, 7758, 7659, 7445, 7248};
     float map_y[MAP_NUM] = {
 0.0,  1.0,  2.0,  3.0,  4.0,  5.0,  6.0,  7.0,  8.0,  9.0,  10.0};
-    float fit_x[8][MAP_NUM] = {0};
+    float fit_x[8] = {0};
     bool  yes_no = false;
     float progress = 0;
     float cali_progress = 0; 
-    void doAppCali();  
+    // void doAppCali();  
     void doRobotArmCali();
     void getFitParams();
     void putFitParams();
+    void set_robot_cali_ready();
 };
 #endif

@@ -49,7 +49,7 @@ void Flatness::init() {
     }
     delay(10);
   }
-  Serial.println(str);
+  // Serial.println(str);
 
 #elif defined(SENSOR_1_1)
   wire_host.begin(8, 9, 400000U);
@@ -68,7 +68,7 @@ void Flatness::init() {
     }
     delay(10);
   }
-  Serial.println(str);
+  // Serial.println(str);
 
 #elif defined(SENSOR_1_2)
   /*
@@ -91,7 +91,7 @@ void Flatness::init() {
     }
     delay(10);
   }
-  Serial.println(str);
+  // Serial.println(str);
 
 #elif defined(SENSOR_1_4)
   wire_host.begin(8, 9, 400000U);
@@ -110,9 +110,9 @@ void Flatness::init() {
     }
     delay(10);
   }
-  Serial.println(str);
+  // Serial.println(str);
 #endif
-  // getFitParams();
+  getFitParams();
   for(int i = 0; i < SENSOR_NUM; i++){
     raw_vec[i].resize(20);
     filt_vec[i].resize(10);
@@ -236,9 +236,9 @@ void Flatness::UpdateAllInOne() {
 }
 
 int Flatness::ProcessMeasureFSM() {
-  uint8_t state = manage.flatness.measure.state;
+  uint8_t state = manage.flat.measure.state;
   if(state == M_IDLE){return state;}
-  float measure_source = manage.flatness.flat_live;
+  float measure_source = manage.flat.flat_live;
   if (state == M_MEASURE_DONE || state == M_UPLOAD_DONE) {
     if(fabs(measure_source - hold_ref) > 2.0f){
       hold_ref = 0;
@@ -247,11 +247,11 @@ int Flatness::ProcessMeasureFSM() {
     }
     return state;
   }
-  if(manage.flatness.measure.progress < 100){
-    manage.flatness.measure.progress += 10;
+  if(manage.flat.progress < 100){
+    manage.flat.progress += 10;
     return state = M_MEASURING;
   }
-  manage.flatness.flat_hold = measure_source;
+  manage.flat.flat_hold = measure_source;
   hold_ref = measure_source;
   manage.set_flat_progress(100);
   return state = M_MEASURE_DONE;
@@ -296,18 +296,18 @@ void Flatness::mapDist(int id, float x) {
 
 void Flatness::CalculateFlatness() {
   // block flag
-  if(ads_online[2] && ads_online[3] && manage.flatness.sub_online == false){
-    manage.flatness.sub_online = true;
-    manage.flatness.online_block = 2;
+  if(ads_online[2] && ads_online[3] && manage.flat.sub_online == false){
+    manage.flat.sub_online = true;
+    manage.flat.online_block = 2;
   }
-  else if((!ads_online[2] || !ads_online[3])&& manage.flatness.sub_online == true){
-    manage.flatness.sub_online = false;
-    manage.flatness.online_block = 1;
+  else if((!ads_online[2] || !ads_online[3])&& manage.flat.sub_online == true){
+    manage.flat.sub_online = false;
+    manage.flat.online_block = 1;
   }
   // ready flag
 for(int i = 0;i < SENSOR_NUM;i++){
-  if(filt_peak[i] > 30)manage.flatness.ready[i] = 0;
-  else manage.flatness.ready[i] = 1;
+  if(filt_peak[i] > 30)manage.flat.ready[i] = 0;
+  else manage.flat.ready[i] = 1;
 }
 // CalculateFlatness
 byte valid_size = 0;
@@ -354,128 +354,114 @@ void Flatness::setZeros() {
   cali_progress = 100;
 }
 
-void Flatness::doAppCali() {
-  // status checks
-  if (manage.flat_state != FLAT_APP_CALI) {return;}
-  if (manage.flat_height_level == -1) {return;}
-  // get param
-  byte step = manage.flat_height_level;
-  // if collected all already,execute algorithm
-  if (step == CALI_STEP::ECHO) {
-    String str = "";
-    for(int i = 0; i < SENSOR_NUM; ++i) {
-        for(int j = 0; j < MAP_NUM; ++j) {
-            str += String(map_x[i][j]);
-            if (j < MAP_NUM - 1) str += ", ";
-        }
-        str += "\r\n"; 
-    }
-    Serial.println(str); 
-    manage.flat_cali_str += str;
-    manage.has_flat_forward = true;
-  }
-  else if (step == CALI_STEP::SAVE) {
-    for(int i = 0; i < SENSOR_NUM; ++i) {
-        for(int j = 0; j < MAP_NUM; ++j) {
-            map_x[i][j] += fit_x[i][j];
-        }
-    }
-    putFitParams();
-    String str = "OK:Fit";
-    str += "\r\n";
-    manage.flat_cali_str = str;
-    manage.has_flat_forward = true;
-  } else {
-    // print sample data
-    if(step == 0){
-          String str = "warning:step = 0";
-          str += "\r\n";
-          manage.flat_cali_str = str;
-          manage.has_flat_forward = true;
-          manage.flat_height_level = -1;
-          manage.flat_state = FLAT_COMMON;
-          return;      
-    }
-    String str = String(step) + "mm:";
-    for (int i = 0; i < SENSOR_NUM; i++) {
-        if(filt_peak[i] > 30){
-          str = "filt_peak:" + String(filt_peak[i],0);
-          str += "\r\n";
-          manage.flat_cali_str = str;
-          manage.has_flat_forward = true;
-          return;
-        }
-        fit_x[i][step - 1] = filt[i];
-        str += String(fit_x[i][step - 1],0);
-        if (i != SENSOR_NUM - 1) {
-          str += ",";
-        }
-    }
-    str += "\r\n";
-    manage.flat_cali_str = str;
-    manage.has_flat_forward = true;
-  }
-  manage.flat_height_level = -1;
-  manage.flat_state = FLAT_COMMON;
-}
+// void Flatness::doAppCali() {
+//   // status checks
+//   if (manage.flat.state != FLAT_APP_CALI) {return;}
+//   if (manage.flat_height_level == -1) {return;}
+//   // get param
+//   byte step = manage.flat_height_level;
+//   // if collected all already,execute algorithm
+//   if (step == CALI_STEP::ECHO) {
+//     String str = "";
+//     for(int i = 0; i < SENSOR_NUM; ++i) {
+//         for(int j = 0; j < MAP_NUM; ++j) {
+//             str += String(map_x[i][j]);
+//             if (j < MAP_NUM - 1) str += ", ";
+//         }
+//         str += "\r\n"; 
+//     }
+//     // Serial.println(str); 
+//     manage.flat_cali_str += str;
+//     manage.has_flat_forward = true;
+//   }
+//   else if (step == CALI_STEP::SAVE) {
+//     for(int i = 0; i < SENSOR_NUM; ++i) {
+//         for(int j = 0; j < MAP_NUM; ++j) {
+//             map_x[i][j] += fit_x[i][j];
+//         }
+//     }
+//     putFitParams();
+//     String str = "OK:Fit";
+//     str += "\r\n";
+//     manage.flat_cali_str = str;
+//     manage.has_flat_forward = true;
+//   } else {
+//     // print sample data
+//     if(step == 0){
+//           String str = "warning:step = 0";
+//           str += "\r\n";
+//           manage.flat_cali_str = str;
+//           manage.has_flat_forward = true;
+//           manage.flat_height_level = -1;
+//           manage.flat.state = FLAT_COMMON;
+//           return;      
+//     }
+//     String str = String(step) + "mm:";
+//     for (int i = 0; i < SENSOR_NUM; i++) {
+//         if(filt_peak[i] > 30){
+//           str = "filt_peak:" + String(filt_peak[i],0);
+//           str += "\r\n";
+//           manage.flat_cali_str = str;
+//           manage.has_flat_forward = true;
+//           return;
+//         }
+//         fit_x[i][step - 1] = filt[i];
+//         str += String(fit_x[i][step - 1],0);
+//         if (i != SENSOR_NUM - 1) {
+//           str += ",";
+//         }
+//     }
+//     str += "\r\n";
+//     manage.flat_cali_str = str;
+//     manage.has_flat_forward = true;
+//   }
+//   manage.flat_height_level = -1;
+//   manage.flat.state = FLAT_COMMON;
+// }
 
 void Flatness::doRobotArmCali() {
   // status checks
-  if (manage.flat_state != FLAT_ROBOT_ARM_CALI) {return;}
-  if (manage.flat_height_level == -1) {return;}
-  // get param
-  byte step = manage.flat_height_level;
-  // if collected all already,execute algorithm
-  if (step == CALI_STEP::ECHO) {
-    String str = "";
-    for(int i = 0; i < SENSOR_NUM; ++i) {
-        for(int j = 0; j < MAP_NUM; ++j) {
-            str += String(map_x[i][j]);
-            if (j < MAP_NUM - 1) str += ", ";
-        }
-        str += "\r\n"; 
-    }
-    Serial.println(str); 
-  }
-  else if (step == CALI_STEP::SAVE) {
-    for(int i = 0; i < SENSOR_NUM; ++i) {
-        for(int j = 0; j < MAP_NUM; ++j) {
-            map_x[i][j] += fit_x[i][j];
-        }
-    }
+  if (manage.flat.state != FLAT_ROBOT_ARM_CALI) {return;}
+  byte step = manage.flat.cali.step;
+  if(step == 11){
+    manage.flat.state = FLAT_COMMON;
+    manage.flat.cali.step = 0;
     putFitParams();
-    String str = "OK:Fit";
-    str += "\r\n";
-    Serial.println(str); 
-  } else {
-    // print sample data
-    if(step == 0){
-          String str = "warning:step = 0";
-          str += "\r\n";
-          Serial.println(str); 
-          manage.flat_height_level = -1;
-          manage.flat_state = FLAT_COMMON;
-          return;      
-    }
-    String str = String(step) + "mm:";
-    for (int i = 0; i < SENSOR_NUM; i++) {
-        // if(filt_peak[i] > 30){
-        //   str = "filt_peak:" + String(filt_peak[i],0);
-        //   str += "\r\n";
-        //   Serial.println(str); 
-        //   return;
-        // }
-        fit_x[i][step - 1] = filt[i];
-        str += String(fit_x[i][step - 1],0);
-        if (i != SENSOR_NUM - 1) {
-          str += ",";
-        }
-    }
-    str += "\r\n";
-    Serial.println(str); 
+    Serial.println("INFO SaveCalibrationParams");
+    return;
   }
-  manage.flat_height_level = -1;
-  manage.flat_state = FLAT_COMMON;
+
+  if(manage.flat.progress == 0){
+    for (int i = 0; i < SENSOR_NUM; i++)fit_x[i] = 0;
+  }
+
+  String str = "INFO " + String(step) + "mm:";
+  for (int i = 0; i < SENSOR_NUM; i++) {
+    if(filt_peak[i] > 30){
+      manage.flat.progress = 0;
+      return;
+    }
+    // sample data
+  }
+  manage.flat.progress += 5;
+  // fit_x[i] += filt[i]; 
+  if(manage.flat.progress == 100){
+    for (int i = 0; i < SENSOR_NUM; i++) {
+      map_x[i][step] = filt[i];
+      str += String(map_x[i][step],0);
+      if (i != SENSOR_NUM - 1) {
+        str += ",";
+      }
+    }
+    Serial.println(str);
+    manage.flat.progress = 0;
+    manage.flat.cali.step ++;
+    String str_cmd = "RobotCali "+ String(manage.flat.cali.step);
+    Serial.println(str_cmd);
+  }
+  
+  
+
 }
 
 float Flatness::modifyDecimal(float value) {
@@ -516,7 +502,7 @@ void Flatness::putFitParams() {
 
 void Flatness::getFitParams() {
   // HACK
-  Serial.println("getFitParams begin");
+  // Serial.println("getFitParams begin");
   stores.begin("FIT", true);
   String key = "";
   for (int i = 0; i < SENSOR_NUM; i++) {
@@ -526,15 +512,15 @@ void Flatness::getFitParams() {
     }
   }
   stores.end();
-  String str;
-    for(int i = 0; i < 8; ++i) {
-        for(int j = 0; j < MAP_NUM; ++j) {
-            str += String(map_x[i][j]);
-            if (j < MAP_NUM - 1) str += ", ";
-        }
-        str += "\n"; 
-    }
-    Serial.println(str); 
+  // String str;
+  //   for(int i = 0; i < 8; ++i) {
+  //       for(int j = 0; j < MAP_NUM; ++j) {
+  //           str += String(map_x[i][j]);
+  //           if (j < MAP_NUM - 1) str += ", ";
+  //       }
+  //       str += "\n"; 
+  //   }
+  //   Serial.println(str); 
 }
 
 bool  Flatness::HandleError_Wire(byte error, byte addr) {
@@ -599,6 +585,6 @@ void Flatness::PrintDebugInfo(byte debug) {
       ESP_LOGE("", "set_debug:%d", debug);
       break;
   }
-  if (str != NULL) Serial.println(str);
+  // if (str != NULL) Serial.println(str);
 }
 

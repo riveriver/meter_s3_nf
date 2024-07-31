@@ -44,13 +44,49 @@ enum PAGE_DEFINE {
     PAGE_ZERO_ANGLE,
     PAGE_ZERO_FLAT,
     PAGE_ZERO_RESET,
-    PAGE_CALI_FLAT,
     PAGE_LIGHT_SWITCH,
     PAGE_INFO,
     PAGE_IMU_CALI_INFO,
+    PAGE_CALI_FLAT,
     PAGE_IMU_FACTORY_ZERO,
     PAGE_FLAT_FACTORY_ZERO
 };
+
+enum FLAT_FSM_DEFINE {
+    FLAT_COMMON,
+    FLAT_CALI_ZERO,
+    FLAT_CALI_COMPLETE,
+    FLAT_FACTORY_ZERO,
+    FLAT_LCD_CALI,
+    FLAT_APP_CALI,
+    FLAT_ROBOT_ARM_CALI,
+};
+
+enum MEASURE_FSM_DEFINE {
+  M_IDLE,
+  M_UNSTABLE,
+  M_MEASURING,
+  M_MEASURE_DONE,
+  M_UPLOAD_DONE
+};
+
+/*
+state:
+idle 0x00
+request motion 0x01
+wait for motion 0x02
+collect data 0x03
+collect complete 0x04
+
+*/
+enum ROBOT_CALI_FSM_DEFINE
+{
+    ROBOT_CALI_IDLE,
+    REQUEST_MOTION,
+    WAIT_MOTION,
+    COLLECT_DATA,
+};
+
 
 enum SPEED_MODE_DEFINE {
     SPEED_MODE_STANDARD,
@@ -100,14 +136,6 @@ enum BLE_COM_DEFINE{
   VERSION_HARDWARE_BASE = 9,
 };
 
-enum MeasureStatus {
-  M_IDLE,
-  M_UNSTABLE,
-  M_MEASURING,
-  M_MEASURE_DONE,
-  M_UPLOAD_DONE
-};
-
 enum HOME_MODE{
   HOME_ANGLE,
   HOME_SLOPE,
@@ -123,16 +151,6 @@ enum IMU_FSM_DEFINE
     IMU_CALI_ZERO,
     IMU_COMPLETE,
     IMU_FACTORY_ZERO,
-};
-
-enum FLAT_FSM_DEFINE {
-    FLAT_COMMON,
-    FLAT_CALI_ZERO,
-    FLAT_CALI_COMPLETE,
-    FLAT_FACTORY_ZERO,
-    FLAT_LCD_CALI,
-    FLAT_APP_CALI,
-    FLAT_ROBOT_ARM_CALI,
 };
 
 enum CALI_STEP{
@@ -170,13 +188,16 @@ struct FlatnessMeter{
   byte  sub_online = 0;
   byte  online_block = 0;
   byte  ready[8] = {0};
+  byte state = 0;
+  byte progress = 0;
   Measure measure;
+  Calibration cali;
 };
 Preferences   pref;
 public:
   Measure measure;
   ClinoMeter  clino;
-  FlatnessMeter flatness;
+  FlatnessMeter flat;
 
 #ifdef HARDWARE_0_0
   int ver_software = 001;
@@ -221,7 +242,7 @@ byte meter_type = 12;
   byte pre_home_mode = 0;
   byte flat_cali_cmd = 0;
   Calibration imu_cali;
-  Calibration dist_cali;
+  
   int     block_time;
   int     cali_count = 0;
   byte    speed_mode  = SPEED_MODE_QUICK;
@@ -252,7 +273,25 @@ byte meter_type = 12;
   String  to_app_str = "";
   String  angle_info = "";
   int8_t  flat_height_level = -1; 
-  int8_t  flat_state = FLAT_COMMON;
+  int8_t  robot_cali_height = 0;
+  int8_t  robot_cali_state = 0; 
+
+  void initMeter(){
+
+    pref.begin("Meter",false);
+    meter_type = pref.getInt("Type",11);
+    home_mode  = pref.getInt("Home",HOME_ANGLE);
+    speed_mode = pref.getInt("Speed",SPEED_MODE_QUICK);
+    // warn_light_onoff = pref.getInt("WarnMode",true);
+    warn_angle = pref.getFloat("WarnAngle",0);
+    warn_flat = pref.getFloat("WarnFlat",0);
+    sleep_time = pref.getInt("Sleep",15);
+    pref.end();
+    home_size = (meter_type > 10) ? 4 : 2;
+    home_mode = home_mode % home_size;
+
+    page = PAGE_CALI_FLAT;
+  }
 
 float roundToZeroOrFive(float value,int bits) {
     float decimalPart = value - floor(value);  // 获取小数部分
@@ -328,54 +367,37 @@ float ConvertToSlope(float angle) {
   void set_flat_live(float value,int arrow){
     if(value >= flat_th){value = 99.9f;}
     if(value <= 0.5)value = 0;
-    flatness.arrow_live = arrow;
-    flatness.flat_live  = value;
+    flat.arrow_live = arrow;
+    flat.flat_live  = value;
   }
 
   void set_flat_progress(int value){
     if(value < 0 || value > 100){return;}
-    flatness.measure.progress = value;
-    ESP_LOGE("progress","%d",flatness.measure.progress);
+    flat.progress = value;
   }
 
   void hold_flatness(float value,int arrow){
-    flatness.arrow_hold = arrow;
-    flatness.flat_hold  = value;
+    flat.arrow_hold = arrow;
+    flat.flat_hold  = value;
   }
 
   void start_flatness_measure(){
-    if(flatness.measure.state == M_IDLE 
-    || flatness.measure.state == M_MEASURE_DONE 
-    || flatness.measure.state == M_UPLOAD_DONE){
-      flatness.measure.progress = 0;
-      flatness.measure.state = M_UNSTABLE;
+    if(flat.measure.state == M_IDLE 
+    || flat.measure.state == M_MEASURE_DONE 
+    || flat.measure.state == M_UPLOAD_DONE){
+      flat.progress = 0;
+      flat.measure.state = M_UNSTABLE;
     }
-  }
-
-  void initMeter(){
-    // perf start
-    pref.begin("Meter",false);
-    meter_type = pref.getInt("Type",11);
-    home_mode  = pref.getInt("Home",HOME_ANGLE);
-    speed_mode = pref.getInt("Speed",SPEED_MODE_QUICK);
-    // warn_light_onoff = pref.getInt("WarnMode",true);
-    warn_angle = pref.getFloat("WarnAngle",0);
-    warn_flat = pref.getFloat("WarnFlat",0);
-    sleep_time = pref.getInt("Sleep",15);
-    pref.end();
-    home_size = (meter_type > 10) ? 4 : 2;
-    home_mode = home_mode % home_size;
-    // pref end
   }
 
   void updateSystem(){
     if(home_mode == HOME_FLATNESS){
-      measure.state    = flatness.measure.state;
-      measure.progress = flatness.measure.progress;
+      measure.state    = flat.state;
+      measure.progress = flat.measure.progress;
     }
     else if(home_mode == HOME_SLOPE_FLATNESS && auto_mode_select == HOME_AUTO_FLATNESS){
-      measure.state    = flatness.measure.state;
-      measure.progress = flatness.measure.progress;
+      measure.state    = flat.state;
+      measure.progress = flat.measure.progress;
     }
     else{
       measure.state    = clino.measure.state;
@@ -393,8 +415,8 @@ float ConvertToSlope(float angle) {
     has_home_change = 1;
     clino.measure.state = M_IDLE;
     clino.measure.progress = 0;
-    flatness.measure.state = M_IDLE;
-    flatness.measure.progress = 0;
+    flat.measure.state = M_IDLE;
+    flat.measure.progress = 0;
     while(!pref.begin("Meter",false)){
     }
     pref.putInt("Home",home_mode);
@@ -411,7 +433,7 @@ float ConvertToSlope(float angle) {
   void resetMeasure(){
     measure.state = M_IDLE;
     clino.measure.state = M_IDLE;
-    flatness.measure.state = M_IDLE;
+    flat.measure.state = M_IDLE;
   }
 
 template<typename T>
@@ -505,7 +527,7 @@ void WarningLightFSM(){
       }
     }
     else if(home_mode == HOME_FLATNESS){
-      if (fabs(flatness.flat_hold) < warn_flat) {
+      if (fabs(flat.flat_hold) < warn_flat) {
         ControlWarningLight(1);
         return;
       }
@@ -518,7 +540,7 @@ void WarningLightFSM(){
         }
       }
       else if(auto_mode_select == HOME_AUTO_FLATNESS){
-        if (fabs(flatness.flat_hold) < warn_flat) {
+        if (fabs(flat.flat_hold) < warn_flat) {
           ControlWarningLight(1);
           return;
         }
@@ -531,7 +553,6 @@ void WarningLightFSM(){
   }
 }
 };
-
-
 #endif 
+
 
