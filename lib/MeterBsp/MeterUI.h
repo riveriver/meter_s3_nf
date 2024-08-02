@@ -54,6 +54,7 @@ private:
     void pageResetFactoryZero();
     void pageRobotCali();
     void pageRobotCaliFlatness();
+    void pageRobotCaliAngle();
     /* ----- Home ----- */
     bool ifSwitchHome();
     void Primary_DrawCommon();

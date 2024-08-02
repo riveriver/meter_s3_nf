@@ -41,7 +41,7 @@ public:
     float raw_peak[8]   = {0};
     float filt_peak[8]  = {0};
     float filt[8]   = {0}; /** @brief Filted ADS1115 ADC reading.*/
-    float dist[8]   = {0}; /** @brief Distance value CalculateFlatness from ADCfilt.*/
+    float dist[8]   = {0}; /** @brief Distance value calculateFlatness from ADCfilt.*/
     float dist_map[8]   = {0};
     float dist_linear[8]   = {0};
     float zeros[8]  = {0};
@@ -60,12 +60,12 @@ void  init();
     byte max_sensor = 0;
     const float dist_th = 50.0f;
     MedianFilter median;
-    std::vector<int> filt_vec[8];
+    std::vector<float> filt_vec[8];
     std::vector<int> raw_vec[8];
     float modifyDecimal(float value);
     int  ProcessMeasureFSM();
     void UpdateAllInOne();
-    void CalculateFlatness();
+    void calculateFlatness();
     void PrintDebugInfo(byte debug);
     bool HandleError_Wire(byte error, byte addr);
     void mapDist(int id, float x);

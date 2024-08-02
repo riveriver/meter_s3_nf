@@ -76,17 +76,14 @@ void IMU42688::unpackFromC3(unsigned char info){
               for(int i = 0;i < cali_rx_index;i++){
                 manage.cali_forward_str += cali_rx_buffer[i];
               }
-              // HACK
-              // Serial.println(manage.cali_forward_str);
-              
               cali_rx_index = 0;
-              manage.has_imu_forward = true;
+              Serial.println(manage.cali_forward_str);
+              // manage.has_imu_forward = true;
               unpack_step = STEP_FRAME_HEAD;
           }else{
             cali_rx_buffer[cali_rx_index] = info;
             cali_rx_index++;
             if (cali_rx_index >= 64) {cali_rx_index = 64 - 1;}
-          // }
         }
         break;
       default:

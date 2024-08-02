@@ -264,6 +264,12 @@ switch (manage.reset_state) {
       manage.flat.cali.step %= 11;
     }
   break;
+  case PAGE_CALI_ANGLE:
+    if(Press_Back){
+      manage.page = PAGE_HOME;
+      manage.cursor = 0;
+    } 
+  break;
   default:
   if(Press_Back){manage.page = PAGE_HOME;manage.cursor = 0;}
   break;

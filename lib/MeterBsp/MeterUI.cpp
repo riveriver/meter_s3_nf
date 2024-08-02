@@ -317,7 +317,7 @@ void MeterUI::Primary_DrawFlatSlope() {
     } else if (manage.slope_standard == 2000.0f) {
       screen_h.drawXBM(82, 2, 28, 9, bitmap_unit_2000mm);
     } else {
-      ESP_LOGE("USER", "[ERROR]slope_standard!!!");
+      ESP_LOGE("USER", "[E]slope_standard!!!");
     }
     screen_h.drawXBM(108, 31, 17, 15, BITMAP_MMM);
     (slope_show, 6, 1, str_show);
@@ -659,22 +659,32 @@ void MeterUI::pageAutoCaliFlatness() {
     screen_h.drawStr(10,28, "Wait For Cmd");
   }
   screen_h.drawStr(64,42, String(manage.flat.cali.step).c_str());
-   screen_h.drawXBM(18, 54, 92, 6, bitmap_h_loading);
+  screen_h.drawXBM(18, 54, 92, 6, bitmap_h_loading);
   screen_h.drawBox(19, 55, manage.flat.progress * 0.9, 3);
 }
 
 
 void MeterUI::pageRobotCaliFlatness() {
   screen_h.setFont(u8g2_font_helvB10_tr);
-  screen_h.drawStr(0, 12, "Flat Robot Cali");
-  screen_h.drawBox(0, 14, 128, 2);
+  screen_h.drawStr(0, 14, "Flat Robot Cali");
+  screen_h.drawBox(0, 15, 128, 2);
   if(manage.flat.state == FLAT_ROBOT_ARM_CALI){
-    screen_h.drawStr(18,28, "Robot Cali...");
+    screen_h.drawStr(18,28, "Flat Robot Cali...");
   }else{
     screen_h.drawStr(18,28, "Wait For Cmd");
   }
   String str = "Height: " + String(manage.flat.cali.step) + " mm";
-  screen_h.drawStr(18,42, str.c_str());
+  screen_h.drawStr(18,40, str.c_str());
+  str = "MaxPeak: " + String(manage.max_filt_peak,0);
+  screen_h.drawStr(18,52, str.c_str());
+  screen_h.drawXBM(18, 54, 92, 6, bitmap_h_loading);
+  screen_h.drawBox(19, 55, manage.flat.progress * 0.9, 3);
+}
+
+void MeterUI::pageRobotCaliAngle() {
+  screen_h.setFont(u8g2_font_helvB10_tr);
+  screen_h.drawStr(0, 12, "Angle Robot Cali");
+  screen_h.drawBox(0, 14, 128, 2);
   screen_h.drawXBM(18, 54, 92, 6, bitmap_h_loading);
   screen_h.drawBox(19, 55, manage.flat.progress * 0.9, 3);
 }
@@ -1173,6 +1183,9 @@ void MeterUI::Update() {
         break;
       case PAGE_CALI_FLAT:
         pageRobotCaliFlatness();
+        break;
+      case PAGE_CALI_ANGLE:
+        pageRobotCaliAngle();
         break;
       case PAGE_IMU_FACTORY_ZERO:
         pageImuFactoryZero();

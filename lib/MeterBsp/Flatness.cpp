@@ -115,7 +115,7 @@ void Flatness::init() {
   getFitParams();
   for(int i = 0; i < SENSOR_NUM; i++){
     raw_vec[i].resize(20);
-    filt_vec[i].resize(10);
+    filt_vec[i].resize(5);
   }
 }
 
@@ -192,15 +192,18 @@ void Flatness::UpdateAllInOne() {
     p_wire = i < 1 ? &wire_host : &wire_sub;
     int addr = 0x48;
     p_wire->beginTransmission(addr);
+    // ADC offline
     if (p_wire->endTransmission() != 0){
       for (int j = 0; j < channel_num; j++) {
         byte id = i * 4 + j;
-        raw[id] = 0;
+        raw[id]  = 0;
         filt[id] = 0;
         dist[id] = 0;
+        raw_peak[id] = 0;
+        filt_peak[id] = 0;
         sensor_online[id] = false;
       }
-      break;
+      continue;
     }
     for (int j = 0; j < channel_num; j++) {
       byte id = i * 4 + j;
@@ -213,12 +216,15 @@ void Flatness::UpdateAllInOne() {
         raw_vec[id].erase(raw_vec[id].begin());
       }
       raw_vec[id].push_back(raw[id]);
+      std::vector<int> raw_temp = raw_vec[id];
+#ifdef FACTORY_TEST
       // HACK calculate raw peak
       float  raw_max = *std::max_element(raw_vec[id].begin(), raw_vec[id].end());
       float  raw_min = *std::min_element(raw_vec[id].begin(), raw_vec[id].end());
       raw_peak[id] = raw_max - raw_min; 
+#endif
       // filt
-      filt[id] = median.calculateMedian(raw_vec[id]);
+      filt[id] = median.calculateMedian(raw_temp);
       if (filt_vec[id].size() == filt_vec[id].capacity()) {
         filt_vec[id].erase(filt_vec[id].begin());
       }
@@ -294,7 +300,7 @@ void Flatness::mapDist(int id, float x) {
     return;
 }
 
-void Flatness::CalculateFlatness() {
+void Flatness::calculateFlatness() {
   // block flag
   if(ads_online[2] && ads_online[3] && manage.flat.sub_online == false){
     manage.flat.sub_online = true;
@@ -309,7 +315,6 @@ for(int i = 0;i < SENSOR_NUM;i++){
   if(filt_peak[i] > 30)manage.flat.ready[i] = 0;
   else manage.flat.ready[i] = 1;
 }
-// CalculateFlatness
 byte valid_size = 0;
 float flat = dist_th;
 float max = -dist_th;
@@ -352,6 +357,186 @@ void Flatness::setZeros() {
     zeros[i] = filt[i];
   }
   cali_progress = 100;
+}
+
+int stable_count  = 0;
+void Flatness::doRobotArmCali() {
+  // status checks
+  if (manage.flat.state != FLAT_ROBOT_ARM_CALI) {return;}
+  byte step = manage.flat.cali.step;
+  if(step == 11){
+    manage.flat.state = FLAT_COMMON;
+    manage.flat.cali.step = 0;
+    putFitParams();
+    Serial.println("[D] SaveCalibrationParams");
+    return;
+  }
+
+  if(manage.flat.progress == 0){
+    for (int i = 0; i < SENSOR_NUM; i++)fit_x[i] = 0;
+  }
+
+  String str = "[D] " + String(step) + "mm:";
+
+  float max = 0;
+  for (int i = 0; i < SENSOR_NUM; i++) {
+      if (filt_peak[i] > max) {
+        max = filt_peak[i];
+      }
+  }
+  
+  manage.max_filt_peak = max;
+  if (max > 100) {
+      stable_count = 0;
+      return;
+  } else {
+      stable_count++;
+  }
+
+  if(stable_count == 20){
+  for (int i = 0; i < SENSOR_NUM; i++){fit_x[i] += filt[i];}
+    manage.flat.progress += 50;
+    stable_count = 0;
+  }
+  // wait for stable
+  
+  if(manage.flat.progress == 100){
+    for (int i = 0; i < SENSOR_NUM; i++) {
+      map_x[i][step] = fit_x[i] / 2;
+      str += String(map_x[i][step],0);
+      if (i != SENSOR_NUM - 1) {
+        str += ",";
+      }
+    }
+    Serial.println(str);
+    manage.flat.progress = 0;
+    manage.flat.cali.step ++;
+    String str_cmd = "robot.cali.flat,"+ String(manage.flat.cali.step);
+    Serial.println(str_cmd);
+  }
+}
+
+float Flatness::modifyDecimal(float value) {
+  // 获取小数部分
+  float decimalPart = fmod(value, 1.0f);
+
+  // 将小数部分转换为0到9之间的整数
+  int firstDecimalDigit = (int)(decimalPart * 10);  // 注意：可能会有精度损失
+
+  // 根据条件修改第一位小数
+  if (firstDecimalDigit <= 3) {
+    firstDecimalDigit = 0;
+  } else if (firstDecimalDigit > 3 && firstDecimalDigit < 8) {
+    firstDecimalDigit = 5;
+  } else {                  // 假设这里指的是大于7
+    firstDecimalDigit = 0;  // 进1后本位变成0
+    // 注意：实际进位需要考虑整体数值加1的问题
+    value += 1.0f - (float)firstDecimalDigit / 10.0f;
+  }
+
+  // 将修改后的第一位小数重新组合回原浮点数
+  float modifiedValue = value - decimalPart + (float)firstDecimalDigit / 10.0f;
+
+  return modifiedValue;
+}
+
+void Flatness::putFitParams() {
+  stores.begin("FIT", false);
+  String key = "";
+  for(int i = 0; i < SENSOR_NUM; i++){
+    for(int j = 0; j < 10; j++){
+      key = String(i) + String(j);
+      stores.putFloat(key.c_str(),map_x[i][j]);
+    }
+  }
+  stores.end();
+}
+
+void Flatness::getFitParams() {
+  stores.begin("FIT", true);
+  String key = "";
+  for (int i = 0; i < SENSOR_NUM; i++) {
+    for(int j = 0; j < MAP_NUM; j++){
+      key = String(i) + String(j);
+      map_x[i][j] = stores.getFloat(key.c_str(),0);
+    }
+  }
+  stores.end();
+  String str;
+    for(int i = 0; i < 8; ++i) {
+        for(int j = 0; j < MAP_NUM; ++j) {
+            str += String(map_x[i][j]);
+            if (j < MAP_NUM - 1) str += ", ";
+        }
+        str += "\n"; 
+    }
+    Serial.println(str); 
+}
+
+bool  Flatness::HandleError_Wire(byte error, byte addr) {
+  switch (error) {
+    case 0:
+      ESP_LOGE("wire", "0x%X:success", addr);
+      return true;
+    case 1:
+      ESP_LOGE("wire", "0x%X:data too long to fit in transmit buffer", addr);
+      return false;
+    case 2:
+      ESP_LOGE("wire", "0x%X:received NACK on transmit of i", addr);
+      return false;
+    case 3:
+      ESP_LOGE("wire", "0x%X:received NACK on transmit of data", addr);
+      return false;
+    case 4:
+      ESP_LOGE("wire", "other error");
+      return false;
+    case 5:
+      ESP_LOGE("wire", "timeout");
+      return false;
+    default:
+      ESP_LOGE("wire", "error:%d\n");
+      return false;
+  }
+}
+
+void Flatness::PrintDebugInfo(byte debug) {
+  // TODO Not elegant, needs to be optimized
+  // Serial_Print_Raw_Data  = debug & 0b00000001;
+  // Serial_Print_Filt_Data = debug & 0b00000010;
+  // Serial_Print_Dist_Data = debug & 0b00000100;
+
+  if (debug == 0) return;
+  // debug = 1;
+  String str = "";
+  switch (debug) {
+    case 1:
+      // TODO Not elegant: use template<typename T>
+      str = "raw:";
+      for (int i = 0; i < SENSOR_NUM; i++) {
+        if (i > 0) str += ",";
+        str += String(raw[i]);
+      }
+      break;
+    case 2:
+      str = manage.buildFireWaterInfo("filt", filt, SENSOR_NUM, 0);
+      break;
+    case 3:
+      str = manage.buildFireWaterInfo("dist", dist, SENSOR_NUM, 1);
+      break;
+    case 4:
+      str = "compare:";
+      for (int i = 0; i < SENSOR_NUM; i++) {
+        if (i > 0) str += ",";
+        str += String(raw[i]);
+        str += ",";
+        str += String(filt[i], 0);
+      }
+      break;
+    default:
+      ESP_LOGE("", "set_debug:%d", debug);
+      break;
+  }
+  if (str != NULL) Serial.println(str);
 }
 
 // void Flatness::doAppCali() {
@@ -418,173 +603,3 @@ void Flatness::setZeros() {
 //   manage.flat_height_level = -1;
 //   manage.flat.state = FLAT_COMMON;
 // }
-
-void Flatness::doRobotArmCali() {
-  // status checks
-  if (manage.flat.state != FLAT_ROBOT_ARM_CALI) {return;}
-  byte step = manage.flat.cali.step;
-  if(step == 11){
-    manage.flat.state = FLAT_COMMON;
-    manage.flat.cali.step = 0;
-    putFitParams();
-    Serial.println("INFO SaveCalibrationParams");
-    return;
-  }
-
-  if(manage.flat.progress == 0){
-    for (int i = 0; i < SENSOR_NUM; i++)fit_x[i] = 0;
-  }
-
-  String str = "INFO " + String(step) + "mm:";
-  for (int i = 0; i < SENSOR_NUM; i++) {
-    if(filt_peak[i] > 30){
-      manage.flat.progress = 0;
-      return;
-    }
-    // sample data
-  }
-  manage.flat.progress += 5;
-  // fit_x[i] += filt[i]; 
-  if(manage.flat.progress == 100){
-    for (int i = 0; i < SENSOR_NUM; i++) {
-      map_x[i][step] = filt[i];
-      str += String(map_x[i][step],0);
-      if (i != SENSOR_NUM - 1) {
-        str += ",";
-      }
-    }
-    Serial.println(str);
-    manage.flat.progress = 0;
-    manage.flat.cali.step ++;
-    String str_cmd = "RobotCali "+ String(manage.flat.cali.step);
-    Serial.println(str_cmd);
-  }
-  
-  
-
-}
-
-float Flatness::modifyDecimal(float value) {
-  // 获取小数部分
-  float decimalPart = fmod(value, 1.0f);
-
-  // 将小数部分转换为0到9之间的整数
-  int firstDecimalDigit = (int)(decimalPart * 10);  // 注意：可能会有精度损失
-
-  // 根据条件修改第一位小数
-  if (firstDecimalDigit <= 3) {
-    firstDecimalDigit = 0;
-  } else if (firstDecimalDigit > 3 && firstDecimalDigit < 8) {
-    firstDecimalDigit = 5;
-  } else {                  // 假设这里指的是大于7
-    firstDecimalDigit = 0;  // 进1后本位变成0
-    // 注意：实际进位需要考虑整体数值加1的问题
-    value += 1.0f - (float)firstDecimalDigit / 10.0f;
-  }
-
-  // 将修改后的第一位小数重新组合回原浮点数
-  float modifiedValue = value - decimalPart + (float)firstDecimalDigit / 10.0f;
-
-  return modifiedValue;
-}
-
-void Flatness::putFitParams() {
-  stores.begin("FIT", false);
-  String key = "";
-  for(int i = 0; i < SENSOR_NUM; i++){
-    for(int j = 0; j < 10; j++){
-      key = String(i) + String(j);
-      stores.putFloat(key.c_str(),map_x[i][j]);
-    }
-  }
-  stores.end();
-}
-
-void Flatness::getFitParams() {
-  // HACK
-  // Serial.println("getFitParams begin");
-  stores.begin("FIT", true);
-  String key = "";
-  for (int i = 0; i < SENSOR_NUM; i++) {
-    for(int j = 0; j < MAP_NUM; j++){
-      key = String(i) + String(j);
-      map_x[i][j] = stores.getFloat(key.c_str(),0);
-    }
-  }
-  stores.end();
-  // String str;
-  //   for(int i = 0; i < 8; ++i) {
-  //       for(int j = 0; j < MAP_NUM; ++j) {
-  //           str += String(map_x[i][j]);
-  //           if (j < MAP_NUM - 1) str += ", ";
-  //       }
-  //       str += "\n"; 
-  //   }
-  //   Serial.println(str); 
-}
-
-bool  Flatness::HandleError_Wire(byte error, byte addr) {
-  switch (error) {
-    case 0:
-      ESP_LOGE("wire", "0x%X:success", addr);
-      return true;
-    case 1:
-      ESP_LOGE("wire", "0x%X:data too long to fit in transmit buffer", addr);
-      return false;
-    case 2:
-      ESP_LOGE("wire", "0x%X:received NACK on transmit of i", addr);
-      return false;
-    case 3:
-      ESP_LOGE("wire", "0x%X:received NACK on transmit of data", addr);
-      return false;
-    case 4:
-      ESP_LOGE("wire", "other error");
-      return false;
-    case 5:
-      ESP_LOGE("wire", "timeout");
-      return false;
-    default:
-      ESP_LOGE("wire", "error:%d\n");
-      return false;
-  }
-}
-
-void Flatness::PrintDebugInfo(byte debug) {
-  // TODO Not elegant, needs to be optimized
-  // Serial_Print_Raw_Data  = debug & 0b00000001;
-  // Serial_Print_Filt_Data = debug & 0b00000010;
-  // Serial_Print_Dist_Data = debug & 0b00000100;
-
-  if (debug == 0) return;
-  String str = "";
-  switch (debug) {
-    case 1:
-      // TODO Not elegant: use template<typename T>
-      str = "raw:";
-      for (int i = 0; i < SENSOR_NUM; i++) {
-        if (i > 0) str += ",";
-        str += String(raw[i]);
-      }
-      break;
-    case 2:
-      str = manage.buildFireWaterInfo("filt", filt, SENSOR_NUM, 0);
-      break;
-    case 3:
-      str = manage.buildFireWaterInfo("dist", dist, SENSOR_NUM, 1);
-      break;
-    case 4:
-      str = "compare:";
-      for (int i = 0; i < SENSOR_NUM; i++) {
-        if (i > 0) str += ",";
-        str += String(raw[i]);
-        str += ",";
-        str += String(filt[i], 0);
-      }
-      break;
-    default:
-      ESP_LOGE("", "set_debug:%d", debug);
-      break;
-  }
-  // if (str != NULL) Serial.println(str);
-}
-

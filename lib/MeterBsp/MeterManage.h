@@ -48,6 +48,7 @@ enum PAGE_DEFINE {
     PAGE_INFO,
     PAGE_IMU_CALI_INFO,
     PAGE_CALI_FLAT,
+    PAGE_CALI_ANGLE,
     PAGE_IMU_FACTORY_ZERO,
     PAGE_FLAT_FACTORY_ZERO
 };
@@ -222,11 +223,7 @@ byte meter_type = 11;
 #elif defined(TYPE_2000)
 byte meter_type = 12;
 #endif
-#ifdef FACTORY_TEST
   byte flat_debug = 0;
-#else
-  byte flat_debug = 0;
-#endif
   int imu_version = 0;
 
   // MeterUI *p_display;
@@ -275,6 +272,7 @@ byte meter_type = 12;
   int8_t  flat_height_level = -1; 
   int8_t  robot_cali_height = 0;
   int8_t  robot_cali_state = 0; 
+  float max_filt_peak = 0;
 
   void initMeter(){
 
@@ -289,8 +287,7 @@ byte meter_type = 12;
     pref.end();
     home_size = (meter_type > 10) ? 4 : 2;
     home_mode = home_mode % home_size;
-
-    page = PAGE_CALI_FLAT;
+    page = PAGE_HOME;
   }
 
 float roundToZeroOrFive(float value,int bits) {

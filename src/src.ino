@@ -11,9 +11,9 @@
 #include "MeterManage.h"
 #include "CmdParser.h"
 #include "BLE.h"
-#include "comm_protocol.h"
+#include "CommProtocol.h"
 extern BLE ble;
-StringCmdParser cmd_parser(" ");
+StringCmdParser cmd_parser(",");
 Meter manage;
 Flatness flat;
 IMU42688 imu;
@@ -35,7 +35,7 @@ Ticker timer_button[6];
  Core 1 :
   I2C : Wire 0 : 0x48 ~ 0x4b ads1115 (Distance sensor)
         Wire 1 : 0x48 ~ 0x4a ads1115 (Distance sensor) + 0x68 DS3231 (Real Time
- Clock) UART : Serial 1 : Esp32-c3 communication (IMU) Serial 2 : Esp32-s3
+ Clock) imu_task : Serial 1 : Esp32-c3 communication (IMU) Serial 2 : Esp32-s3
  communication (POGO Pin Communication) BLE : Server. adc : Battery input. Other
  : LED (LLC2842) Calculation : \b Measure::Update()
 */
@@ -56,10 +56,8 @@ int LOOP_Period = 300;
 
 static void comm_task(void *pvParameter) {
 #ifdef COMM_CLI
-  cmd_parser.register_cmd("test",cmd_print_test);
-  cmd_parser.register_cmd("version",cmd_print_version);
-  cmd_parser.register_cmd("flat",cmd_print_flat);
-  cmd_parser.register_cmd("cali_to_meter",cmd_robot_cali);
+  cmd_parser.register_cmd(KEY_METER_CALI_FLAT,cmd_robot_cali_flat);
+  cmd_parser.register_cmd(KEY_METER_CALI_ANGLE,cmd_meter_cali_angle);
   BaseType_t xWasDelayed;
   TickType_t xLastWakeTime = xTaskGetTickCount();
   while(1){
@@ -153,7 +151,7 @@ static void flat_measure_task(void *pvParameter) {
       flat.doRobotArmCali();
       break;
     default:
-      flat.CalculateFlatness();
+      flat.calculateFlatness();
       break;
     }
     xLastWakeTime = xTaskGetTickCount();
@@ -195,7 +193,7 @@ void setup() {
 #ifdef UI_ON
   xTaskCreatePinnedToCore(User_Interface, "Core 0 UI", 16384, NULL, 5, T_OLED,1);
 #endif
-  xTaskCreatePinnedToCore(UART, "Core 1 UART", 16384, NULL, 4, T_UART, 0);
+  xTaskCreatePinnedToCore(imu_task, "Core 1 imu_task", 16384, NULL, 4, T_UART, 0);
   xTaskCreatePinnedToCore(LOOP, "Core 1 LOOP", 8192, NULL, 2, T_LOOP, 0);
   attachInterrupt(digitalPinToInterrupt(IO_Button0), ButtonPress0, CHANGE);
   attachInterrupt(digitalPinToInterrupt(IO_Button1), ButtonPress1, FALLING);
@@ -301,7 +299,7 @@ static void User_Interface(void *pvParameter) {
   }
 }
 
-static void UART(void *pvParameter) {
+static void imu_task(void *pvParameter) {
   BaseType_t xWasDelayed;
   TickType_t xLastWakeTime = xTaskGetTickCount();
   for (;;) {

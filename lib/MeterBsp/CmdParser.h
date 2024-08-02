@@ -29,7 +29,7 @@ public:
             std::vector<std::string> args(tokens.begin() + 1, tokens.end());
             return it->second(args.size(), args);
         } else {
-            std::string message = "[Unknown_Cmd] " + input_str;
+            std::string message = "[Unknown] " + input_str;
             std::cout << message << std::endl;
             return 0;
         }
