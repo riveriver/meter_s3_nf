@@ -39,14 +39,13 @@ const byte IO_IMU_TX = 39;      // Define the IO port for IMU Transmitter
 enum PAGE_DEFINE {
     PAGE_HOME,
     PAGE_BLE,
+    PAGE_LIGHT_SWITCH,
     PAGE_ZERO_MENU,
     PAGE_ZERO_HOME,
     PAGE_ZERO_ANGLE,
     PAGE_ZERO_FLAT,
     PAGE_ZERO_RESET,
-    PAGE_LIGHT_SWITCH,
     PAGE_INFO,
-    PAGE_IMU_CALI_INFO,
     PAGE_CALI_FLAT,
     PAGE_CALI_ANGLE,
     PAGE_IMU_FACTORY_ZERO,
@@ -66,7 +65,7 @@ enum FLAT_FSM_DEFINE {
 enum MEASURE_FSM_DEFINE {
   M_IDLE,
   M_UNSTABLE,
-  M_MEASURING,
+  M_MEASURE_ING,
   M_MEASURE_DONE,
   M_UPLOAD_DONE
 };
@@ -138,7 +137,7 @@ enum BLE_COM_DEFINE{
 };
 
 enum HOME_MODE{
-  HOME_ANGLE,
+  HOME_ANGLE = 0,
   HOME_SLOPE,
   HOME_FLATNESS,
   HOME_SLOPE_FLATNESS,
@@ -186,7 +185,7 @@ struct FlatnessMeter{
   float flat_hold = 0.0f;
   byte  arrow_live = 0;
   byte  arrow_hold = 0;
-  byte  sub_online = 0;
+  bool  adc_online[4] = {0};
   byte  online_block = 0;
   byte  ready[8] = {0};
   byte state = 0;
@@ -194,6 +193,7 @@ struct FlatnessMeter{
   Measure measure;
   Calibration cali;
 };
+
 Preferences   pref;
 public:
   Measure measure;
@@ -241,6 +241,7 @@ byte meter_type = 12;
   Calibration imu_cali;
   
   int     block_time;
+  String  ui_info = "";
   int     cali_count = 0;
   byte    speed_mode  = SPEED_MODE_QUICK;
   byte warn_light_onoff  = true;
@@ -248,9 +249,9 @@ byte meter_type = 12;
   // byte    warrning_mode = WARN_ON_LIGHT_ON;
   byte  dash_num = 0;
   float flat_th = 50.0f;
-  
+  byte  block_ble = false;
   byte  adjust_num = 0;
-  float warn_angle = 0;
+  float warn_slope = 0;
   float warn_flat  = 0;
   float slope_standard = 1000.0f;
   int  sleep_time = 15.0f;
@@ -258,9 +259,6 @@ byte meter_type = 12;
   int  battery;
   bool has_update_dist = false;
   bool has_home_change = false;
-  bool has_imu_forward = false;
-  bool has_flat_forward = false;
-  bool has_angle_forward = false;
   bool if_ble_switch    = false;
   byte reset_state = 0; // 0:normal, 1:reset, 2:reset_done
   bool reset_yesno = false;
@@ -275,13 +273,12 @@ byte meter_type = 12;
   float max_filt_peak = 0;
 
   void initMeter(){
-
     pref.begin("Meter",false);
     meter_type = pref.getInt("Type",11);
     home_mode  = pref.getInt("Home",HOME_ANGLE);
     speed_mode = pref.getInt("Speed",SPEED_MODE_QUICK);
     // warn_light_onoff = pref.getInt("WarnMode",true);
-    warn_angle = pref.getFloat("WarnAngle",0);
+    warn_slope = pref.getFloat("WarnSlope",0);
     warn_flat = pref.getFloat("WarnFlat",0);
     sleep_time = pref.getInt("Sleep",15);
     pref.end();
@@ -323,12 +320,7 @@ float ConvertToSlope(float angle) {
     if (arrow == 1) {angle = fabs(angle);} 
     else if(arrow == 2){angle = -fabs(angle);}
     else{angle = fabs(angle);}
-    if(home_mode == HOME_ANGLE){
-      clino.angle_live = roundToZeroOrFive(angle,2);
-    }
-    else {
-      clino.angle_live = angle;
-    }
+    clino.angle_live = roundToZeroOrFive(angle,2);
     clino.slope_live = ConvertToSlope(angle);
     clino.arrow_live = arrow;
   }
@@ -337,11 +329,7 @@ float ConvertToSlope(float angle) {
     if (arrow == 1) {angle = fabs(angle);} 
     else if(arrow == 2){angle = -fabs(angle);}
     else{angle = fabs(angle);}
-    if(home_mode == HOME_ANGLE){
     clino.angle_hold = roundToZeroOrFive(angle,2);
-    }else{
-      clino.angle_hold = angle;
-    }
     clino.slope_hold = ConvertToSlope(angle);
     clino.arrow_hold = arrow;
   }
@@ -368,9 +356,10 @@ float ConvertToSlope(float angle) {
     flat.flat_live  = value;
   }
 
-  void set_flat_progress(int value){
+  void set_flat_measure_progress(int value){
     if(value < 0 || value > 100){return;}
-    flat.progress = value;
+    flat.measure.progress = value;
+    Serial.printf("pro:%d\n\r",flat.measure.progress);
   }
 
   void hold_flatness(float value,int arrow){
@@ -389,11 +378,11 @@ float ConvertToSlope(float angle) {
 
   void updateSystem(){
     if(home_mode == HOME_FLATNESS){
-      measure.state    = flat.state;
+      measure.state    = flat.measure.state;
       measure.progress = flat.measure.progress;
     }
     else if(home_mode == HOME_SLOPE_FLATNESS && auto_mode_select == HOME_AUTO_FLATNESS){
-      measure.state    = flat.state;
+      measure.state    = flat.measure.state;
       measure.progress = flat.measure.progress;
     }
     else{
@@ -459,9 +448,9 @@ void put_warrning_light(){
   pref.end();
 }
 
-void put_warn_angle(){
+void put_warn_slope(){
   while(!pref.begin("Meter",false)){}
-  pref.putFloat("WarnAngle", warn_angle);
+  pref.putFloat("WarnSlope", warn_slope);
   pref.end();
 }
 
@@ -518,7 +507,7 @@ void WarningLightFSM(){
 
   if (measure.state == M_MEASURE_DONE || measure.state == M_UPLOAD_DONE) {
     if(home_mode == HOME_ANGLE || home_mode == HOME_SLOPE){
-      if (fabs(clino.slope_hold) < ConvertToSlope(warn_angle)) {
+      if (fabs(clino.slope_hold) < warn_slope) {
         ControlWarningLight(1);
         return;
       }
@@ -531,7 +520,7 @@ void WarningLightFSM(){
     }
     else if(home_mode == HOME_SLOPE_FLATNESS){
       if(auto_mode_select == HOME_AUTO_SLOPE){
-        if (fabs(clino.slope_hold) < ConvertToSlope(warn_angle)) {
+        if (fabs(clino.slope_hold) < warn_slope) {
           ControlWarningLight(1);
           return;
         }

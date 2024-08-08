@@ -11,7 +11,7 @@ private:
     const int on_time = 1000;             /** @brief Time to trigger Long Press power off.*/
     const int off_time = 1000;             /** @brief Time period for showing the power off image.*/
     int off_count = 0;
-    MeterUI *p_ui;
+    MeterUI *pUI;
     SLED *p_led;
     byte OnOffPin;
     byte EN_Pin;
@@ -51,7 +51,7 @@ public:
             while (true){}
         }
         
-        p_ui = &ui;
+        pUI = &ui;
         p_led = &LED;
         OnOffPin = IO_OnOff;
         EN_Pin = IO_EN;
@@ -85,12 +85,12 @@ public:
         if (!CommandSleep && !AutoSleep)return;
         if (CommandSleep)
         {
-            p_ui->Block("Shutting Down", off_time);
+            pUI->Block("Shutting Down", off_time);
             ESP_LOGE("","Command Sleep");
         }
         else if (AutoSleep)
         {
-            p_ui->Block("Auto Sleep", 5000);
+            pUI->Block("Auto Sleep", 5000);
             ESP_LOGE("","Auto Sleep");
         }
 
@@ -113,7 +113,7 @@ public:
             }
             // Wait for button release
             while (digitalRead(OnOffPin)){}
-            p_ui->TurnOff();
+            pUI->TurnOff();
             digitalWrite(EN_Pin, LOW);
             while (true){};
         }

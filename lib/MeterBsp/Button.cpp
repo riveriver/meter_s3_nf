@@ -219,14 +219,14 @@ switch (manage.reset_state) {
     if(manage.reset_progress > 90){manage.reset_progress  = 100;manage.reset_state = 2;}
     break;
     case 2:
-      p_ui->Block("Reset FactoryZero",1000);
+      pUI->Block("Reset FactoryZero",1000);
       manage.reset_state = 0;
       manage.reset_progress = 0;
       manage.page = PAGE_HOME;
       manage.cursor = 0;
       break;
     default:
-      p_ui->Block("E: ResetFactoryZero",1000);
+      pUI->Block("E: ResetFactoryZero",1000);
       manage.reset_state = 0;
       manage.page = PAGE_HOME;
     break;
@@ -281,11 +281,11 @@ switch (manage.reset_state) {
 bool Button::CanMeasure() {
   if (manage.clino.measure.state == M_UNSTABLE)
     return false;
-  else if (manage.clino.measure.state == M_MEASURING)
+  else if (manage.clino.measure.state == M_MEASURE_ING)
     return false;
   else if (manage.flat.measure.state == M_UNSTABLE)
     return false;
-  else if (manage.flat.measure.state == M_MEASURING)
+  else if (manage.flat.measure.state == M_MEASURE_ING)
     return false;
   return true;
 }

@@ -13,7 +13,7 @@
 #include "Bitmap_Manage.h"
 #include "MeterManage.h"
 
-#define NUM_LHX 16
+#define NUM_LHX 14
 #define NUM_LHY 20
 #define NUM_LVX 0
 #define NUM_LVY 52
@@ -117,12 +117,13 @@ void MeterUI::TurnOn() {
     return;
   }
   screen_h.setContrast(0x87);
+  // screen_h.setContrast(0x70);
 
   if (!screen_s.begin()) {
     ESP_LOGE("screen_s", "screen_s failed");
     return;
   }
-  screen_s.setContrast(0x70);
+  screen_s.setContrast(0x87);
 
   // open logo
   screen_h.drawXBM(0, 0, 128, 64, Open_Logo);
@@ -163,21 +164,22 @@ void MeterUI::Primary_DrawCommon() {
   if (*(pBLEState + 6) == true) {
     screen_h.drawXBM(39, 2, 13, 12, bitmap_bluetooth);
   }
-  if (manage.flat.sub_online) {
+  if (manage.flat.adc_online[1]) {
     screen_h.drawXBM(82, 2, 28, 9, bitmap_unit_2000mm);
   } else screen_h.drawXBM(82, 2, 28, 9, bitmap_unit_1000mm);
+  // progress bar
   screen_h.drawXBM(18, 54, 92, 6, bitmap_h_loading);
-  int px[2] = {19, 16};
-  int py[2] = {55, 3};
+  byte px[2] = {19, 16};
+  byte py[2] = {55, 3};
+  byte l = 90;
   bar_timer++;
-  int l = 90;
   if (measure_state == M_UNSTABLE) {
     bar_timer %= (l - px[1]) * 2;
     screen_h.drawBox((bar_timer > (l - px[1]))
                          ? px[0] + (l - px[1]) * 2 - bar_timer
                          : px[0] + bar_timer,
                      py[0], px[1], py[1]);
-  } else if (measure_state == M_MEASURING) {
+  } else if (measure_state == M_MEASURE_ING) {
     bar_timer = 0;
     screen_h.drawBox(px[0], py[0], measure_bar * l / 100, py[1]);
   } else if (measure_state == M_MEASURE_DONE ||
@@ -248,7 +250,7 @@ void MeterUI::Primary_DrawAngle() {
 }
 
 void MeterUI::Primary_DrawSlope() {
-  screen_h.drawXBM(110, 30, 17, 15, BITMAP_MMM);
+  screen_h.drawXBM(110, 30, 17, 15, BITMAP_UNIT_MMM);
   if (g_this == 2 || g_this == 5) {
     screen_h.drawXBM(LINE_LHX, LINE_LHY, 45, 3, Main_Dash_45x3);
   } else {
@@ -271,7 +273,7 @@ void MeterUI::Primary_DrawFlat() {
 
   screen_h.setFont(u8g2_font_6x12_mr);
   for(int i = 0; i < 8; i++){
-    if(pDS->sensor_online[i]){
+    if(pDS->sensor_valid[i]){
       if(manage.flat.ready[i]){
         screen_h.setDrawColor(0);
       }
@@ -279,6 +281,7 @@ void MeterUI::Primary_DrawFlat() {
     }
   }
   screen_h.setDrawColor(1);
+  
   if (flat_show > 50.0f) {
     screen_h.drawXBM(LINE_LHX, LINE_LHY, 45, 3, Main_Dash_45x3);
   } else {
@@ -289,11 +292,8 @@ void MeterUI::Primary_DrawFlat() {
 
 void MeterUI::Primary_DrawFlatSlope() {
   if (manage.auto_mode_select == HOME_AUTO_FLATNESS) {
-    // screen_h.drawXBM(5, 25, 14, 14, bitmap_flat_icon);
+    screen_h.drawXBM(5, 25, 14, 14, bitmap_flat_icon);
     screen_h.drawXBM(110, 30, 17, 15, BITMAP_UNIT_MM);
-  if (manage.flat.sub_online) {
-    screen_h.drawXBM(82, 2, 28, 9, bitmap_unit_2000mm);
-  } else screen_h.drawXBM(82, 2, 28, 9, bitmap_unit_1000mm);
     if (measure_state == M_MEASURE_DONE || measure_state == M_UPLOAD_DONE) {
       screen_h.setDrawColor(2);
       screen_h.drawBox(3, 20, 35, 24);
@@ -310,16 +310,7 @@ void MeterUI::Primary_DrawFlatSlope() {
     }
   } else {
     screen_h.drawXBM(5, 25, 14, 14, bitmap_vertical_icon);
-    if (manage.slope_standard == 1000.0f) {
-      screen_h.drawXBM(82, 2, 28, 9, bitmap_unit_1000mm);
-    } else if (manage.slope_standard == 1200.0f) {
-      screen_h.drawXBM(82, 2, 28, 9, bitmap_unit_500mm);
-    } else if (manage.slope_standard == 2000.0f) {
-      screen_h.drawXBM(82, 2, 28, 9, bitmap_unit_2000mm);
-    } else {
-      ESP_LOGE("USER", "[E]slope_standard!!!");
-    }
-    screen_h.drawXBM(108, 31, 17, 15, BITMAP_MMM);
+    screen_h.drawXBM(108, 31, 17, 15, BITMAP_UNIT_MMM);
     (slope_show, 6, 1, str_show);
     drawNum_16x24(NUM_LHX, NUM_LHY, str_show, 6);
   }
@@ -338,7 +329,7 @@ void MeterUI::Minor_DrawCommon() {
                            ? px[0] + (l - px[1]) * 2 - bar_timer
                            : px[0] + bar_timer,
                        py[0], px[1], py[1]);
-    } else if (measure_state == M_MEASURING) {
+    } else if (measure_state == M_MEASURE_ING) {
       bar_timer = 0;
       screen_s.drawBox(px[0], py[0], measure_bar * l / 100, py[1]);
     } else if (measure_state == M_MEASURE_DONE ||
@@ -347,16 +338,7 @@ void MeterUI::Minor_DrawCommon() {
       screen_s.drawBox(px[0], py[0], l, py[1]);
     }
   } else {
-    screen_s.drawXBM(18, 2, 17, 9, BITMAP_BATTERY);
-    screen_s.drawBox(21, 4, *pBattry * 12 / 100, 5);
-    if (*(pBLEState + 6) == true) {
-      screen_s.drawXBM(39, 2, 13, 12, bitmap_bluetooth);
-    }
-    if (manage.flat.sub_online) {
-      screen_s.drawXBM(82, 2, 28, 9, bitmap_unit_2000mm);
-    } else screen_s.drawXBM(82, 2, 28, 9, bitmap_unit_1000mm);
     screen_s.drawXBM(18, 54, 92, 6, bitmap_h_loading);
-
     int px[2] = {19, 16};
     int py[2] = {55, 3};
     bar_timer++;
@@ -367,7 +349,7 @@ void MeterUI::Minor_DrawCommon() {
                            ? px[0] + (l - px[1]) * 2 - bar_timer
                            : px[0] + bar_timer,
                        py[0], px[1], py[1]);
-    } else if (measure_state == M_MEASURING) {
+    } else if (measure_state == M_MEASURE_ING) {
       bar_timer = 0;
       screen_s.drawBox(px[0], py[0], measure_bar * l / 100, py[1]);
     } else if (measure_state == M_MEASURE_DONE ||
@@ -402,7 +384,7 @@ void MeterUI::Minor_DrawAngle() {
 void MeterUI::Minor_DrawSlope() {
   dtostrf(slope_show, 6, 1, str_slope);
   if (rotation == VERTICAL) {
-    screen_s.drawXBM(41, 72, 17, 15, BITMAP_MMM);
+    screen_s.drawXBM(41, 72, 17, 15, BITMAP_UNIT_MMM);
     screen_s.drawXBM(26, 3, 14, 14, bitmap_slope_icon);
     if (g_this == 2 || g_this == 5) {
       screen_s.drawXBM(LINE_LVX, LINE_LVY, 45, 3, Main_Dash_45x3);
@@ -410,7 +392,7 @@ void MeterUI::Minor_DrawSlope() {
       Minor_drawNum_10x16(NUM_LVX, NUM_LVY, str_slope, 6);
     }
   } else {
-    screen_s.drawXBM(110, 30, 17, 15, BITMAP_MMM);
+    screen_s.drawXBM(110, 30, 17, 15, BITMAP_UNIT_MMM);
     if (g_this == 2 || g_this == 5) {
       screen_s.drawXBM(LINE_LHX, LINE_LHY, 45, 3, Main_Dash_45x3);
     } else {
@@ -437,6 +419,7 @@ void MeterUI::Minor_DrawFlat() {
       Minor_drawNum_10x16(NUM_LVX, NUM_LVY, str_show, 6);
     }
   } else {
+    screen_s.drawXBM(0, 24, 14, 14, bitmap_flat_icon);
     screen_s.drawXBM(110, 30, 17, 15, BITMAP_UNIT_MM);
     if (measure_state == M_MEASURE_DONE || measure_state == M_UPLOAD_DONE) {
       screen_s.setDrawColor(2);
@@ -447,22 +430,23 @@ void MeterUI::Minor_DrawFlat() {
       screen_s.setDrawColor(1);
     }
 
-  screen_s.setFont(u8g2_font_6x12_mr);
-  for(int i = 0; i < 8; i++){
-    if(pDS->sensor_online[i]){
-      if(manage.flat.ready[i]){
-        screen_s.setDrawColor(0);
+    screen_s.setFont(u8g2_font_6x12_mr);
+    for(int i = 0; i < 8; i++){
+      if(pDS->sensor_valid[i]){
+        if(manage.flat.ready[i]){
+          screen_s.setDrawColor(0);
+        }
+        screen_s.drawStr(37 + 7 * i, 10,String(i + 1).c_str());
       }
-      screen_s.drawStr(37 + 7 * i, 10,String(i + 1).c_str());
     }
-  }
-  screen_s.setDrawColor(1);
-  if (flat_show > 50.0f) {
-    screen_s.drawXBM(LINE_LHX, LINE_LHY, 45, 3, Main_Dash_45x3);
-  } else {
-      dtostrf(flat_show, 6, 1, str_show);
-      Minor_drawNum_16x24(NUM_LHX, NUM_LHY, str_show, 6);
-  }
+    
+    screen_s.setDrawColor(1);
+    if (flat_show > 50.0f) {
+      screen_s.drawXBM(LINE_LHX, LINE_LHY, 45, 3, Main_Dash_45x3);
+    } else {
+        dtostrf(flat_show, 6, 1, str_show);
+        Minor_drawNum_16x24(NUM_LHX, NUM_LHY, str_show, 6);
+    }
 }
 }
 
@@ -487,7 +471,7 @@ void MeterUI::Minor_DrawFlatSlope() {
       }
     } else {
       screen_s.drawXBM(27, 2, 14, 14, bitmap_vertical_icon);
-      screen_s.drawXBM(41, 72, 17, 15, BITMAP_MMM);
+      screen_s.drawXBM(41, 72, 17, 15, BITMAP_UNIT_MMM);
       dtostrf(slope_show, 6, 1, str_show);
       Minor_drawNum_10x16(NUM_LVX, NUM_LVY, str_show, 6);
     }
@@ -511,7 +495,7 @@ void MeterUI::Minor_DrawFlatSlope() {
       }
     } else {
       screen_s.drawXBM(5, 25, 14, 14, bitmap_vertical_icon);
-      screen_s.drawXBM(108, 31, 17, 15, BITMAP_MMM);
+      screen_s.drawXBM(108, 31, 17, 15, BITMAP_UNIT_MMM);
       dtostrf(slope_show, 6, 1, str_show);
       Minor_drawNum_16x24(NUM_LHX, NUM_LHY, str_show, 6);
     }
@@ -574,14 +558,6 @@ void MeterUI::Minor_DrawArrow() {
                        bitmap_down_1_rotate);  // light_down
     }
   }
-}
-
-void MeterUI::pageAngleCaliInfo() {
-  screen_h.setFont(u8g2_font_7x13B_tr);
-  screen_h.drawStr(2, 10, "AngleCali:");
-  char str[7] = "-----";
-  dtostrf(pIMU->angle_raw[1], 7, 2, str);
-  drawNum_16x24(NUM_LHX, NUM_LHY, str, 7);
 }
 
 void MeterUI::pageSwitchLight() {
@@ -685,6 +661,9 @@ void MeterUI::pageRobotCaliAngle() {
   screen_h.setFont(u8g2_font_helvB10_tr);
   screen_h.drawStr(0, 12, "Angle Robot Cali");
   screen_h.drawBox(0, 14, 128, 2);
+  char str[7] = "-----";
+  dtostrf(pIMU->angle_raw[1], 7, 2, str);
+  drawNum_16x24(NUM_LHX, NUM_LHY, str, 7);
   screen_h.drawXBM(18, 54, 92, 6, bitmap_h_loading);
   screen_h.drawBox(19, 55, manage.flat.progress * 0.9, 3);
 }
@@ -779,13 +758,14 @@ void MeterUI::pageInfo(int selection) {
   screen_h.setFont(u8g2_font_6x12_mr);
   byte size = 10; 
   byte sensor_num = 0; 
+  String str_head = "";
   switch (selection) {
     case 0:
       screen_h.drawStr(0, 8, "Dist_Linear_FPeak");
       for (int i = 0; i < 8; i++) {
         int x_offset = (i < 4) ? 0 : 64;
         int y_offset = 20 + (i < 4 ? i : i - 4) * 14;
-        screen_h.drawStr(x_offset, y_offset, String(pDS->dist_linear[i],1).c_str());
+        screen_h.drawStr(x_offset, y_offset, String(pDS->dist[i],1).c_str());
         screen_h.drawStr(x_offset + 40, y_offset,String(pDS->filt_peak[i],0).c_str());
       }
       break;
@@ -812,20 +792,25 @@ void MeterUI::pageInfo(int selection) {
         pageImuInfo();
       break;
     case 4:
-      size = 10; 
-      sensor_num = 0; 
-      screen_h.drawStr(2, 58, "SensorNum:");
-      screen_h.drawStr(64,58, String(sensor_num).c_str());
-      for(int i = 0; i < size; i++){
-        int x_offset = (i < size/2) ? 0 : 64;
-        int y_offset = (i < size/2 ? i : i - size/2) * 10;
+      str_head = "SensorNum0:" + String(pDS->filt[0],0);
+      screen_h.drawStr(0, 8, str_head.c_str());
+      for (int i = 0; i < 11; i++) {
+        int x_offset = (i % 4) * 32;
+        int y_offset = 20 + + (i / 4) * 14;
         screen_h.drawStr(x_offset, y_offset, String(pDS->map_x[0][i],0).c_str());
       }
       break;
-    // case 5:
-    //   break;
+    case 5:
+      str_head = "SensorNum1:" + String(pDS->filt[1],0);
+      screen_h.drawStr(0, 8, str_head.c_str());
+      for (int i = 0; i < 11; i++) {
+        int x_offset = (i % 4) * 32;
+        int y_offset = 20 + (i / 4) * 14;
+        screen_h.drawStr(x_offset, y_offset, String(pDS->map_x[1][i],0).c_str());
+      }
+      break;
     default:
-      screen_h.drawStr(2, 8, "PAGE:");
+      screen_h.drawStr(2, 8, "EmptyPAGE:");
       screen_h.drawStr(70,8, String(selection).c_str());
       screen_h.drawStr(2, 18, "SOFTWARE:");
       screen_h.drawStr(70,18, String(manage.ver_software).c_str());
@@ -1092,23 +1077,15 @@ void MeterUI::Minor_drawNum_16x24(int x, int y, String str, int size) {
 
 void MeterUI::Update() {
   // do block
-  switch(manage.flat.online_block){
-    // offline
-    case 1:
-      Block("SubMeter Disconnect", 2500);
-      manage.flat.online_block = 0;
-    break;
-    // online
-    case 2:
-      Block("SubMeter Connect", 1500);
-      manage.flat.online_block = 0;
-      break;
-    default:
-      break;
+  if(manage.ui_info != ""){
+    Block(manage.ui_info, 2000);
+    manage.ui_info = "";
+    return;
   }
   if (block_info != "") {
     DoBlock();
     block_info = "";
+    return;
   }
   if (millis() < manage.block_time) return;
   // get param
@@ -1177,9 +1154,6 @@ void MeterUI::Update() {
         break;
       case PAGE_INFO:
         pageInfo(manage.cursor);
-        break;
-      case PAGE_IMU_CALI_INFO:
-        pageAngleCaliInfo();
         break;
       case PAGE_CALI_FLAT:
         pageRobotCaliFlatness();

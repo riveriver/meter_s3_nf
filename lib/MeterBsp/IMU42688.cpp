@@ -17,7 +17,7 @@ Preferences pref;
  * @param [in] Rx : The GPIO for Serial1 RX. default -1.
  * @param [in] Tx : The GPIO for Serial1 TX. default -1.
  */
-void IMU42688::Initialize(uint8_t Rx, uint8_t Tx) {
+void IMU42688::init(uint8_t Rx, uint8_t Tx) {
   Serial1.setRxBufferSize(256);
   Serial1.begin(921600, SERIAL_8N1, Rx, Tx);
 
@@ -51,7 +51,6 @@ void IMU42688::unpackFromC3(unsigned char info){
           unpack_step = STEP_PRASE_CALI;
         }
         else{
-          // ESP_LOGE("COMM","STEP_PRASE_CMD:0x%X",info);
           unpack_step = STEP_FRAME_HEAD;
         }
         break;
@@ -69,7 +68,6 @@ void IMU42688::unpackFromC3(unsigned char info){
         }
         break;
       case STEP_PRASE_CALI:
-        // if(manage.has_imu_forward != true){
           if(info == '>'){
               cali_rx_buffer[cali_rx_index] = '\0';
               manage.cali_forward_str = "";
@@ -78,7 +76,6 @@ void IMU42688::unpackFromC3(unsigned char info){
               }
               cali_rx_index = 0;
               Serial.println(manage.cali_forward_str);
-              // manage.has_imu_forward = true;
               unpack_step = STEP_FRAME_HEAD;
           }else{
             cali_rx_buffer[cali_rx_index] = info;
@@ -309,7 +306,6 @@ void IMU42688::CaliFactoryZero() {
     cali_state = IMU_COMPLETE;
     manage.angle_info = "imu_factory_zero:";
     manage.angle_info += String(e[1], 2) + ",";
-    manage.has_angle_forward = true;
   }
 }
 
@@ -347,7 +343,7 @@ void IMU42688::QuickCalibrate() {
 /**
  * @brief Set all parameters related to the calibration procedure to default.
  */
-void IMU42688:: StopCali() {
+void IMU42688::StopCali() {
   cali_state = IMU_COMMON;
   yes_no = false;
   cali_progress = 0;
@@ -362,7 +358,7 @@ void IMU42688::onMeasureReset() {
 }
 
 void IMU42688::setParam(uint8_t mode) {
-  // HACK measure_total过小会不会导致未稳定下来就测量
+  // HACK measure_total 过小会不会导致未稳定下来就测量
   switch (mode) {
     case SPEED_MODE_STANDARD:
       measure_total = 10;
@@ -399,7 +395,7 @@ int IMU42688::ProcessMeasureFSM() {
     return state;
   }
 
-  // if(state == M_MEASURING){
+  // if(state == M_MEASURE_ING){
     if(fabs(measure_source - stable_ref) > un_stable_th){
       onMeasureReset();
       stable_ref = measure_source;
@@ -415,7 +411,7 @@ int IMU42688::ProcessMeasureFSM() {
       hold_ref  = measure_source;
       return state = M_MEASURE_DONE;
     }
-    return state = M_MEASURING;
+    return state = M_MEASURE_ING;
   // }
 
   // if(state == M_UNSTABLE){
@@ -424,7 +420,7 @@ int IMU42688::ProcessMeasureFSM() {
   //   }
   //   if(stable_count == stable_total){
   //     onMeasureReset();
-  //     return state == M_MEASURING;
+  //     return state == M_MEASURE_ING;
   //   }
   //   stable_count++;
   // }

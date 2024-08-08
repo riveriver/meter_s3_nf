@@ -20,7 +20,7 @@ class IMU42688 {
 enum MeasureStatus {
     M_IDLE,
     M_UNSTABLE,
-    M_MEASURING,
+    M_MEASURE_ING,
     M_MEASURE_DONE,
     M_UPLOAD_DONE
 };
@@ -32,8 +32,7 @@ enum CommStatus{
     STEP_PRASE_CALI
 };
 public:
-    void Initialize(uint8_t Rx /*(-1)*/, uint8_t Tx /*(-1)*/);
-
+    void init(uint8_t Rx, uint8_t Tx);
     uint8_t unpack_step = STEP_FRAME_HEAD; 
     char data_rx_buffer[64];
     uint8_t data_rx_index;

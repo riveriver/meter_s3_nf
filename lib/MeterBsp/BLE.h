@@ -8,7 +8,6 @@
 
 extern Meter manage;
 
-
 struct BLEState {
   uint8_t addr[6];        /** @brief BLE advertising address.*/
   uint8_t is_connect = false; /** @brief Indicate BLE connection status.*/
@@ -24,8 +23,7 @@ public:
 };
 
 class ControlCallbacks : public BLECharacteristicCallbacks {
-  void onSubscribe(NimBLECharacteristic *pCharacteristic,
-                    ble_gap_conn_desc *desc, uint16_t subValue);
+  void onSubscribe(NimBLECharacteristic *pCharacteristic);
   void onWrite(NimBLECharacteristic *pCharacteristic);
 };
 
@@ -36,47 +34,37 @@ class DeveloperCallbacks : public BLECharacteristicCallbacks {
 class BLE {
  public:
   BLEState state;
-  String AddrStr = "";
-  IMU42688 *pIMU;
-  Flatness *pFlat;
   void Init();
-  void Send(float *SendFloat);
-  void DoSwich();
+  void DoSwitch();
   void SendStatus(byte *Send);
   void SendAngle(float SendFloat);
+  void SendSlope(float SendFloat);
   void SendFlatness(float SendFloat);
-  void SendDistance(float *SendFloat);
   void SendHome(byte *Send);
   void sendSyncInfo();
   void parseSyncInfo(int info);
   void parseDeveloperInfo(int info);
   bool QuickNotifyEvent();
-  void ForwardToC3(int info);
+  void ParseAngleCali(int info);
   void ParseFlatnessCali(int info);
   void ParseDebugMode(byte part,byte data);
   void ParseFlatCaliCmd(int info);
-  void ParseMeterType(byte part,byte data);
   void SlowNotifyEvent();
 
  private:
   bool DEBUG = 0;
+  uint8_t pre_ble_state = true;
+  unsigned long slow_sync = 0;
   BLEServer *pServer;
-  BLECharacteristic *DeveloperChar;
+  BLECharacteristic *SlopeChar;
+  BLECharacteristic *AngleChar;
   BLECharacteristic *HomeChar;
   BLECharacteristic *StatusChar;
-  BLECharacteristic *AngleXChar;
-  BLECharacteristic *AngleYChar;
-  BLECharacteristic *AngleZChar;
-  BLECharacteristic *FlatChar;
   BLECharacteristic *ControlChar;
+  BLECharacteristic *DeveloperChar;
+  BLECharacteristic *FlatChar;
   MyServerCallbacks ServerCB;
   ControlCallbacks ControlCallback;
   DeveloperCallbacks DeveloperCallback;
-  uint8_t Pre_OnOff = true;
-  unsigned long slow_sync = 0;
-  unsigned long medium_sync = 0;
-
 };
-
-
 #endif

@@ -31,7 +31,7 @@ public:
   IMU42688 *pIMU;
   uint8_t *pBLEState;
   OnOff *pSleepTime;
-  MeterUI *p_ui;
+  MeterUI *pUI;
   bool Press[6];
   void Update();
   bool CanMeasure();

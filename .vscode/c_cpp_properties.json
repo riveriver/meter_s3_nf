@@ -494,7 +494,6 @@
                 "HARDWARE_3_0",
                 "SENSOR_1_4",
                 "FACTORY_TEST",
-                "COMM_CLI",
                 "UI_ON",
                 "HAVE_CONFIG_H",
                 "MBEDTLS_CONFIG_FILE=\"mbedtls/esp_config.h\"",

@@ -40,6 +40,7 @@ public:
     uint16_t  raw[8]   = {0}; /** @brief ADS1115 ADC raw value buffer.*/
     float raw_peak[8]   = {0};
     float filt_peak[8]  = {0};
+    float refer_peak = 0;
     float filt[8]   = {0}; /** @brief Filted ADS1115 ADC reading.*/
     float dist[8]   = {0}; /** @brief Distance value calculateFlatness from ADCfilt.*/
     float dist_map[8]   = {0};
@@ -48,15 +49,15 @@ public:
     float ft_zeros[8]  = {0};  
     float hold_ref = 0;
     float stable_ref = 0;
-    byte measure_count = 0;
     float measure_sum = 0;
+    float max_dist_num = 0;
 void  init();
     /*****************************************************************************************************
      * Measure
      ******************************************************************************************************/
     bool ads_init[4] = {false};
-    bool ads_online[4] = {false};
-    bool sensor_online[8] = {false};
+    bool adc_online[4] = {false};
+    bool sensor_valid[8] = {false};
     byte max_sensor = 0;
     const float dist_th = 50.0f;
     MedianFilter median;
@@ -71,6 +72,7 @@ void  init();
     void mapDist(int id, float x);
     int ifStable();
     void setZeros();
+    void doAppCali();
 
     /*****************************************************************************************************
      * Calibration
@@ -93,6 +95,8 @@ void  init();
     bool  yes_no = false;
     float progress = 0;
     float cali_progress = 0; 
+    float max_peak = 0; 
+    float measure_count = 0.0;
     // void doAppCali();  
     void doRobotArmCali();
     void getFitParams();

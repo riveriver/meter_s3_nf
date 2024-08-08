@@ -12,46 +12,19 @@
  * version 1.2 simple measurement process because imu measure speed
  * version 1.3 nullptr checking、 while loops add timeout checking、bounds
  * checking、return error code mechanism
- * 24/6/2024 平整度标定：拟合曲线由二元一次函数改为二次多项式，同时不再使用ADC采样值而是使用电压值作为因变量，修改距离计算方式
- * 24/6/2024 平整度标定采样逻辑:现在会等peak稳定之后再采样
  * 
  * @copyright Copyright (c) 2023
  *
  */
 #include <Arduino.h>
 #include "Flatness.h" 
-
+#define M1_NUM 0
+#define M2_NUM 1
 TwoWire wire_host = TwoWire(0);
 TwoWire wire_sub = TwoWire(1);
 
 void Flatness::init() {
-#ifdef HARDWARE_0_0
-  /*
-   wire_host-->1#:0x48C0; 2#:0x48C1; 
-   wire_host-->3#:0x49C0; 4#:0x49C1; 
-   wire_sub -->1#:0x4AC0; 2#:0x4AC1; 
-   wire_sub -->3#:0x4BC0; 4#:0x4BC1; 
-  */
-  // wire process
-  wire_host.begin(8, 9, 400000U);
-  delay(10);
-  wire_sub.begin(4, 5, 400000U);
-  delay(10);
-  TwoWire *p_wire;
-  String str = "[ads_init]";
-  for(int i = 0;i < ADS_NUM; i++){
-    p_wire = i < 2 ? &wire_host : &wire_sub;
-    int addr = 0x48 + i;
-    p_wire->beginTransmission(addr);
-    if (HandleError_Wire(p_wire->endTransmission(), addr) == true) {
-      ads_init[i] = ads1115[i].begin(addr, p_wire);
-      str += String(ads_init[i]) + ",";
-    }
-    delay(10);
-  }
-  // Serial.println(str);
-
-#elif defined(SENSOR_1_1)
+#ifdef SENSOR_1_1
   wire_host.begin(8, 9, 400000U);
   delay(10);
   wire_sub.begin(4, 5, 400000U);
@@ -105,7 +78,9 @@ void Flatness::init() {
     int addr = 0x48;
     p_wire->beginTransmission(addr);
     if (HandleError_Wire(p_wire->endTransmission(), addr)) {
+      adc_online[i] = true;
       ads_init[i] = ads1115[i].begin(addr, p_wire);
+      manage.flat.adc_online[i] = true;
       str += String(ads_init[i]) + ",";
     }
     delay(10);
@@ -114,7 +89,7 @@ void Flatness::init() {
 #endif
   getFitParams();
   for(int i = 0; i < SENSOR_NUM; i++){
-    raw_vec[i].resize(20);
+    raw_vec[i].resize(30);
     filt_vec[i].resize(5);
   }
 }
@@ -135,9 +110,9 @@ void Flatness::UpdateAllInOne() {
     byte addr = 0x49;
     // check ads online
     p_wire->beginTransmission(addr);
-    // if ads offline, set ads_online[i] = false,continue
+    // if ads offline, set adc_online[i] = false,continue
     if (p_wire->endTransmission() != 0){
-      ads_online[i] = false;
+      adc_online[i] = false;
       for (int j = 0; j < channel_num; j++) {
         byte id = i * channel_num + j;
         raw[id] = 0;
@@ -151,8 +126,8 @@ void Flatness::UpdateAllInOne() {
       ads_init[i] = ads1115[i].begin(addr, p_wire);
     }
     // ads online
-    if(ads_online[i] == false){
-      ads_online[i] = true;
+    if(adc_online[i] == false){
+      adc_online[i] = true;
     }
     // read 
     for (int j = 0; j < channel_num; j++) {
@@ -187,13 +162,15 @@ void Flatness::UpdateAllInOne() {
 #elif defined(SENSOR_1_4)
   TwoWire *p_wire;
   byte channel_num = 4;
-  String str = "[ads_init]";
+  byte wire_adc_num = 1;
+  int  adc_addr = 0x48;
+  // Read ADC
   for(int i = 0;i < ADS_NUM; i++){
-    p_wire = i < 1 ? &wire_host : &wire_sub;
-    int addr = 0x48;
-    p_wire->beginTransmission(addr);
+    p_wire = i < wire_adc_num ? &wire_host : &wire_sub;
+    p_wire->beginTransmission(adc_addr);
     // ADC offline
     if (p_wire->endTransmission() != 0){
+      // Sensor offline
       for (int j = 0; j < channel_num; j++) {
         byte id = i * 4 + j;
         raw[id]  = 0;
@@ -201,43 +178,98 @@ void Flatness::UpdateAllInOne() {
         dist[id] = 0;
         raw_peak[id] = 0;
         filt_peak[id] = 0;
-        sensor_online[id] = false;
+        sensor_valid[id] = false;
+      }
+      if(adc_online[i] == true){
+        adc_online[i] = false;
+        manage.flat.adc_online[i] = false;
+        switch (i)
+        {
+        case 0:
+          manage.ui_info = "[E]No_ADC Offline";
+          break;
+        case 1:
+          manage.ui_info = "1m_Mode";
+          break;
+        default:
+          manage.ui_info = "[E]Unkown ADC Offline:" + String(i);
+          break;
+        }
       }
       continue;
     }
+    // ADC online
+    if(adc_online[i] == false){
+      adc_online[i] = true;
+      manage.flat.adc_online[i] = true;
+      switch (i)
+      {
+      case 1:
+        manage.ui_info = "2m_Mode";
+        break;
+      default:
+        manage.ui_info = "[E]Unkown_ADC Online:" + String(i);
+        break;
+      }
+    }
+    if(ads_init[i] == false){
+      ads_init[i] = ads1115[i].begin(0x48, p_wire);
+    }
+    // Read Sensor
     for (int j = 0; j < channel_num; j++) {
       byte id = i * 4 + j;
-      // id check
       if(id >= SENSOR_NUM)continue;
-      // read
       raw[id] = ads1115[i].readADC_SingleEnded(j);
-      // 通过调用erase函数删除vector的第一个元素,再使用push_back函数将raw[id]添加到vector的末尾
+      // raw over th,return
+      if(raw[id] < 5000){
+        filt_vec[id].clear();
+        filt[id] = 99;
+        filt_peak[id] = 99;
+        dist[id] = 99;
+        sensor_valid[id] = false;
+        continue;
+      }
       if (raw_vec[id].size() == raw_vec[id].capacity()) {
         raw_vec[id].erase(raw_vec[id].begin());
       }
       raw_vec[id].push_back(raw[id]);
       std::vector<int> raw_temp = raw_vec[id];
 #ifdef FACTORY_TEST
-      // HACK calculate raw peak
       float  raw_max = *std::max_element(raw_vec[id].begin(), raw_vec[id].end());
       float  raw_min = *std::min_element(raw_vec[id].begin(), raw_vec[id].end());
-      raw_peak[id] = raw_max - raw_min; 
+      raw_peak[id] = raw_max - raw_min;
+      // // raw_peak over th,return
+      // if(raw_peak[id] > 200){
+      //   filt_vec[id].clear();
+      //   filt[id] = 99;
+      //   filt_peak[id] = 99;
+      //   dist[id] = 99;
+      //   sensor_valid[id] = false;
+      //   continue;
+      // }
 #endif
       // filt
       filt[id] = median.calculateMedian(raw_temp);
       if (filt_vec[id].size() == filt_vec[id].capacity()) {
         filt_vec[id].erase(filt_vec[id].begin());
       }
-      // HACK calculate filt peak
       filt_vec[id].push_back(filt[id]);
       float  filt_max = *std::max_element(filt_vec[id].begin(), filt_vec[id].end());
       float  filt_min = *std::min_element(filt_vec[id].begin(), filt_vec[id].end());
       filt_peak[id] = filt_max - filt_min; 
       // map distance
       mapDist(id,filt[id]);
+      sensor_valid[id] = true;
     }
   }
 #endif
+  // ready flag
+  float max_peak = 0;
+  for(int i = 0;i < SENSOR_NUM;i++){
+    if(sensor_valid[i] && filt_peak[i] > max_peak)max_peak = filt_peak[i];
+    if(filt_peak[i] > 30)manage.flat.ready[i] = 0;else manage.flat.ready[i] = 1;
+  }
+  refer_peak = max_peak; 
   PrintDebugInfo(manage.flat_debug);
 }
 
@@ -248,35 +280,40 @@ int Flatness::ProcessMeasureFSM() {
   if (state == M_MEASURE_DONE || state == M_UPLOAD_DONE) {
     if(fabs(measure_source - hold_ref) > 2.0f){
       hold_ref = 0;
-      manage.set_flat_progress(0);
+      manage.set_flat_measure_progress(0);
       return state = M_IDLE;
     }
     return state;
   }
-  if(manage.flat.progress < 100){
-    manage.flat.progress += 10;
-    return state = M_MEASURING;
+  Serial.printf("refer_peak:%f\r\n",refer_peak);
+  if (refer_peak > 30) {
+    measure_count = 0;
+    return state = M_UNSTABLE;
+  }else {
+    measure_count++;
   }
-  manage.flat.flat_hold = measure_source;
-  hold_ref = measure_source;
-  manage.set_flat_progress(100);
-  return state = M_MEASURE_DONE;
+  if(measure_count == 10){
+    measure_count = 0;
+    manage.flat.flat_hold = measure_source;
+    manage.dash_num = max_dist_num;
+    hold_ref = measure_source;
+    manage.set_flat_measure_progress(100);
+    return state = M_MEASURE_DONE;
+  }
+  int pro = measure_count * 100.0 / 10.0;
+  manage.set_flat_measure_progress(pro);
+  return state = M_MEASURE_ING;
 }
 
 void Flatness::mapDist(int id, float x) {
     // param check:id
     if(id >= SENSOR_NUM)return;
-
+    // 
     int start = 0;
     int end = MAP_NUM;
     // 小于0cm默认为0cm
     if(x > map_x[id][0]){
       dist[id] = dist_map[id] = dist_linear[id] = 0;
-      return;
-    }
-    // 大于门洞阈值
-    if(x < 6000){
-      dist[id] = dist_map[id] = dist_linear[id] = 99.9;
       return;
     }
     // 大于10cm，线性插值计算距离
@@ -290,68 +327,45 @@ void Flatness::mapDist(int id, float x) {
         if (map_x[id][mid] == x){
           dist_map[id] = map_y[mid];
           dist_linear[id] = map_y[mid];
+          dist[id] = dist_linear[id];
           return;
         }
         if (x < map_x[id][mid])start = mid + 1;else end = mid - 1;
     }
     dist_map[id] = map_y[end];
     dist_linear[id] = map_y[end] + (map_y[end + 1] - map_y[end]) * (map_x[id][end] - x) / (map_x[id][end] - map_x[id][end + 1]);
-    if(filt_peak[id] < 30){dist[id] = dist_linear[id];}else{dist[id] = dist_map[id];}
+    dist[id] = dist_linear[id];
     return;
 }
 
 void Flatness::calculateFlatness() {
-  // block flag
-  if(ads_online[2] && ads_online[3] && manage.flat.sub_online == false){
-    manage.flat.sub_online = true;
-    manage.flat.online_block = 2;
-  }
-  else if((!ads_online[2] || !ads_online[3])&& manage.flat.sub_online == true){
-    manage.flat.sub_online = false;
-    manage.flat.online_block = 1;
-  }
-  // ready flag
-for(int i = 0;i < SENSOR_NUM;i++){
-  if(filt_peak[i] > 30)manage.flat.ready[i] = 0;
-  else manage.flat.ready[i] = 1;
-}
-byte valid_size = 0;
-float flat = dist_th;
-float max = -dist_th;
-float min = dist_th;
-for (size_t i = 0; i < SENSOR_NUM; ++i) {
-  if(dist[i] != 0 && dist[i] < dist_th){
-    valid_size ++;
-    if (dist[i] > max) {
-        max = dist[i];
-        manage.dash_num = i + 1;
-    }
-    if (dist[i] < min) {
-        min = dist[i];
+
+  byte valid_size = 0;
+  float flat = dist_th;
+  float max = -dist_th;
+  float min = dist_th;
+  for (size_t i = 0; i < SENSOR_NUM; ++i) {
+    if(dist[i] != 0 && dist[i] < dist_th){
+      valid_size ++;
+      if (dist[i] > max) {
+          max = dist[i];
+          max_dist_num = i + 1;
+      }
+      if (dist[i] < min) {
+          min = dist[i];
+      }
     }
   }
-}
-if(manage.flat_abs){
-  flat = valid_size < 1 ? 99.0f : max;
-  manage.set_flat_live(modifyDecimal(flat), 0);
-}else{
-  flat = valid_size < 2 ? 99.0f : max - min;
-  manage.set_flat_live(modifyDecimal(flat), 0);
-}
-
-}
-
-int  Flatness::ifStable() {
-  // check
-  for(int i = 0;i < SENSOR_NUM;i++){
-    if(filt_peak[i] > 30)return i + 1;
+  if(manage.flat_abs){
+    flat = valid_size < 1 ? 99.0f : max;
+    manage.set_flat_live(modifyDecimal(flat), 0);
+  }else{
+    flat = valid_size < 2 ? 99.0f : max - min;
+    manage.set_flat_live(modifyDecimal(flat), 0);
   }
-  return 0;
 }
 
 void Flatness::setZeros() {
-  // check
-  if(ifStable())return;
   // set zeros
   for(int i = 0;i < SENSOR_NUM;i++){
     zeros[i] = filt[i];
@@ -386,7 +400,7 @@ void Flatness::doRobotArmCali() {
   }
   
   manage.max_filt_peak = max;
-  if (max > 100) {
+  if (max > 10) {
       stable_count = 0;
       return;
   } else {
@@ -444,7 +458,7 @@ void Flatness::putFitParams() {
   stores.begin("FIT", false);
   String key = "";
   for(int i = 0; i < SENSOR_NUM; i++){
-    for(int j = 0; j < 10; j++){
+    for(int j = 0; j < 11; j++){
       key = String(i) + String(j);
       stores.putFloat(key.c_str(),map_x[i][j]);
     }
