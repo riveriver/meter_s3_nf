@@ -4,11 +4,11 @@ void BLE::Init() {
   // Start BLE Deviec ----------------------------------------
   BLEDevice::init("Ensightful");
   std::string name_char;
-  if (manage.meter_type == 1) {
+  if (manage.meter_type == METER_TYPE_DEFINE::TYPE_0_5) {
     name_char = "Ensightful_500_";
-  } else if (manage.meter_type == 11) {
+  } else if (manage.meter_type == METER_TYPE_DEFINE::TYPE_1_0) {
     name_char = "Ensightful_1000_";
-  } else if (manage.meter_type == 12) {
+  } else if (manage.meter_type == METER_TYPE_DEFINE::TYPE_2_0) {
     name_char = "Ensightful_2000_";
   } else {
     name_char = "Ensightful_";
@@ -136,12 +136,6 @@ void BLE::SendHome(byte *Send) {
   ControlChar->notify(true);
 }
 
-/* ServerCallbacks */ 
-void MyServerCallbacks::onConnect(BLEServer *pServer, ble_gap_conn_desc *desc) {
-  manage.resetMeasure();
-  p_state->is_connect = true;
-}
-
 void BLE::DoSwitch() {
   // Do nothing if is_advertising status remain the same.
   if (pre_ble_state == state.is_advertising) return;
@@ -164,9 +158,9 @@ void BLE::DoSwitch() {
 
 void BLE::sendSyncInfo() {
   // version_info
-  ControlChar->setValue(manage.ver_software + VERSION_SOFTWARE_BASE * 1000);
+  ControlChar->setValue(manage.version_software + VERSION_SOFTWARE_BASE * 1000);
   ControlChar->notify(true);
-  ControlChar->setValue(manage.ver_hardware + VERSION_HARDWARE_BASE * 1000);
+  ControlChar->setValue(manage.version_hardware + VERSION_HARDWARE_BASE * 1000);
   ControlChar->notify(true);
   ControlChar->setValue(manage.battery);
   ControlChar->notify(true);
@@ -174,6 +168,50 @@ void BLE::sendSyncInfo() {
   ControlChar->notify(true);
   ControlChar->setValue((manage.home_mode) + HOME_MODE_BASE * 1000);
   ControlChar->notify(true);
+}
+
+bool BLE::QuickNotifyEvent() {
+  // HACK
+  bool if_active = false;
+  // send measure status to app
+  SendStatus(&manage.measure.state);
+  if (manage.has_home_change == true) {
+    ControlChar->setValue((manage.home_mode) + HOME_MODE_BASE * 1000);
+    ControlChar->notify(true);
+    manage.has_home_change = false;
+    if_active = true;
+  }
+
+  if (manage.ack_msg != "") {
+    DeveloperChar->setValue(manage.ack_msg);
+    DeveloperChar->notify(true);
+    manage.ack_msg = "";
+    if_active = true;
+  }
+
+  if (manage.angle_msg != "") {
+    DeveloperChar->setValue(manage.angle_msg);
+    DeveloperChar->notify(true);
+    manage.angle_msg = "";
+    if_active = true;
+  }
+
+  if (manage.flatness_msg != "") {
+    DeveloperChar->setValue(manage.flatness_msg);
+    DeveloperChar->notify(true);
+    manage.flatness_msg = "";
+    if_active = true;
+  }
+
+  return if_active;
+}
+
+void BLE::SlowNotifyEvent() {
+  if (millis() - slow_sync > 60000) {
+    ControlChar->setValue(manage.battery);
+    ControlChar->notify(true);
+    slow_sync = millis();
+  }
 }
 
 void BLE::parseDeveloperInfo(int info) {
@@ -190,7 +228,7 @@ void BLE::parseDeveloperInfo(int info) {
       ParseDebugMode(huns, data);
       break;
     case 7:
-      ParseAngleCali(info);
+      ParseAngleCaliCmd(info);
       break;
     case 8:
       ParseFlatCaliCmd(info);
@@ -201,56 +239,7 @@ void BLE::parseDeveloperInfo(int info) {
   }
 }
 
-bool BLE::QuickNotifyEvent() {
-  bool if_active = false;
-  SendStatus(&manage.measure.state);
-  if (manage.has_home_change == true) {
-    ControlChar->setValue((manage.home_mode) + HOME_MODE_BASE * 1000);
-    ControlChar->notify(true);
-    manage.has_home_change = 0;
-    if_active = true;
-  }
-
-  if (manage.to_app_str != "") {
-    DeveloperChar->setValue(manage.to_app_str);
-    DeveloperChar->notify(true);
-    manage.to_app_str = "";
-    if_active = true;
-  }
-
-  if (manage.cali_forward_str != "") {
-    DeveloperChar->setValue(manage.cali_forward_str);
-    DeveloperChar->notify(true);
-    manage.cali_forward_str = "";
-    if_active = true;
-  }
-
-  if (manage.flat_cali_str != "") {
-    DeveloperChar->setValue(manage.flat_cali_str);
-    DeveloperChar->notify(true);
-    manage.flat_cali_str = "";
-    if_active = true;
-  }
-
-  if (manage.angle_info != "") {
-    DeveloperChar->setValue(manage.angle_info);
-    DeveloperChar->notify(true);
-    manage.angle_info = "";
-    if_active = true;
-  }
-
-  return if_active;
-}
-
-void BLE::SlowNotifyEvent() {
-  if (millis() - slow_sync > 60000) {
-    ControlChar->setValue(manage.battery);
-    ControlChar->notify(true);
-    slow_sync = millis();
-  }
-}
-
-void BLE::ParseAngleCali(int info) {
+void BLE::ParseAngleCaliCmd(int info) {
   manage.page = PAGE_CALI_ANGLE;
   String dataString;
   dataString = "";
@@ -271,22 +260,17 @@ void BLE::ParseFlatCaliCmd(int info) {
     if (data == CALI_STEP::RESET) {
       manage.page = PAGE_INFO;
       manage.flat_height_level = -1;
-      manage.SendToApp("cmd[0]:reset success");
+      manage.AckToApp("cmd[0]:reset success");
       return;
     }
     if (manage.flat_height_level == -1) {
       manage.flat_height_level = data;
       manage.flat.state = FLAT_APP_CALI;
     } else {
-      manage.SendToApp("cmd[0]:please reset or wait!");
+      manage.AckToApp("cmd[0]:please reset or wait!");
     }
-  } else if (huns == 9) {
-    manage.adjust_num = ones;
-    manage.flat_height_level = 14;
-    manage.flat.state = FLAT_APP_CALI;
-    manage.SendToApp("single cali:" + String(ones));
-  } else if (huns > 8) {
-    manage.SendToApp("[error]cmd:" + String(huns));
+  }else{
+    manage.AckToApp("[error]cmd:" + String(huns));
   }
 }
 
@@ -322,7 +306,7 @@ void BLE::parseSyncInfo(int info) {
         }
       } else if (huns == 1) {
         manage.sleep_time = tens * 10 + ones;
-        manage.putSleepTime();
+        manage.put_sleep_time();
       }
       break;
     case ANGLE_SEPPD_BASE:
@@ -336,7 +320,7 @@ void BLE::parseSyncInfo(int info) {
         } else {
           manage.warn_light_onoff = false;
         }
-        manage.put_warrning_light();
+        manage.put_warn_light();
       } else if (huns == 1) {
         manage.warn_slope = (float)(tens * 10 + ones) / 10.0;
         manage.put_warn_slope();
@@ -352,7 +336,12 @@ void BLE::parseSyncInfo(int info) {
   }
 }
 
-/* ServerCallbacks */
+/* ServerCallbacks */ 
+void MyServerCallbacks::onConnect(BLEServer *pServer, ble_gap_conn_desc *desc) {
+  manage.resetMeasure();
+  p_state->is_connect = true;
+}
+
 void MyServerCallbacks::onDisconnect(BLEServer *pServer) {
   manage.resetMeasure();
   p_state->is_connect = false;

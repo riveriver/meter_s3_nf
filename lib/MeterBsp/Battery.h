@@ -2,7 +2,7 @@
 #define Battery_H
 
 #include <Arduino.h>
-
+#include "MeterManage.h"
 extern Meter manage;
 
 class Battery
@@ -50,7 +50,7 @@ public:
         int time = millis()/60000;
         if(millis() - record_time > 60000*3){
         record_time = millis();
-        manage.SendToApp("BAT:" + String(V_BW) + "Time:" + String(time));
+        manage.AckToApp("BAT:" + String(V_BW) + "Time:" + String(time));
         }
 #endif
 

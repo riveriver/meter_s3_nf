@@ -1,6 +1,7 @@
 #include "Arduino.h"
 #include <iostream>
 #include <vector>
+#include <sstream>
 #include "MeterManage.h"
 extern Meter manage;
 /* example
@@ -20,84 +21,199 @@ cmd_parser.register_cmd("test",cmd_print_test);
 cmd_parser.parse(rx_str.c_str()); 
 */
 
-int cmd_print_test(size_t argc, const std::vector<std::string>& argv) {
-    std::string str_output = "[test] ";
-    for (size_t i = 0; i < argc; i++) {
-        if (i > 0) {
-            str_output += ", ";
-        }
-        str_output += argv[i];
-    }
-    Serial.println(str_output.c_str());
-    return 0;
-}
-
-int cmd_print_version(size_t argc, const std::vector<std::string>& argv)
-{
-    std::string str = "[version] ";
-    for (size_t i = 0; i < argc; i++) {
-        if (i > 0) {
-            str += ", ";
-        }
-        str += argv[i];
-    }
-    str += ":HARDWARE_3_0; SENSOR_1_4; SOFTWARE_5_3;";
-    Serial.println(str.c_str());
-    return 0;
-}
-
-int cmd_print_flat(size_t argc, const std::vector<std::string>& argv)
-{
-    std::string str = "[flat] ";
-    for (size_t i = 0; i < argc; i++) {
-        if (i > 0) {
-            str += ", ";
-        }
-        str += argv[i];
-    }
-    str += ":9262,9075,8770,8573,8475,8260,8055,7855,7655,7554,7357";
-    Serial.println(str.c_str());
-    return 0;
-}
-
-#define KEY_METER_CALI_FLAT "meter.cali.flat"
-int cmd_robot_cali_flat(size_t argc, const std::vector<std::string>& argv)
+#define KEY_METER_CALI_FLAT "meter.flat.cali"
+int cmd_meter_flat_cali(size_t argc, const std::vector<std::string>& argv)
 {
     std::string str = "";
-    if(argv[0] == "start"){
-        if(manage.flat.state == FLAT_COMMON){
-            manage.page = PAGE_CALI_FLAT;                           
+    if (argc == 0)return 0x03;
+
+    if (argv[0] == "save") {
+        if (manage.flat.state == FLAT_COMMON) {
+            manage.flat.cali.step = CALI_STEP::SAVE;
             manage.flat.state = FLAT_ROBOT_ARM_CALI;
-            str += "[D]OK";
-        }else{
-            str += "[E]FAIL:flat_state = " + std::to_string(manage.flat.state);
+            manage.page = PAGE_CALI_FLAT;
+            str = "[ACK]save";
+            Serial.println(str.c_str());
+            return 0;
+        }
+    } 
+    else if (argv[0] == "record") {
+       if (manage.flat.state == FLAT_COMMON) {
+            manage.flat.cali.step = CALI_STEP::ECHO;
+            manage.flat.state = FLAT_ROBOT_ARM_CALI;
+            manage.page = PAGE_CALI_FLAT;
+            str = "[ACK]record";
+            Serial.println(str.c_str());
+            return 0;
+        }
+    } else if (argv[0] == "reset") {
+        manage.flat.state = FLAT_COMMON;
+        str = "[ACK]reset";
+        Serial.println(str.c_str());
+        return 0;
+    } else {
+        try {
+            int number = std::stoi(argv[0]);
+            if (0 <= number && number <= 10) {
+                if (manage.flat.state == FLAT_COMMON) {
+                    manage.flat.cali.step = number;
+                    manage.flat.state = FLAT_ROBOT_ARM_CALI;
+                    str = "[ACK]step(mm)= " + std::to_string(manage.flat.cali.step);
+                    Serial.println(str.c_str());
+                    manage.page = PAGE_CALI_FLAT;
+                    return 0;
+                }
+            }
+        }
+        catch (...) {
+            // 捕获所有异常
+            return 0x04;
         }
     }
-    Serial.println(str.c_str());
-    return 0;
+    // 如果没有匹配任何条件，则返回错误代码
+    return 0x05;
 }
 
-#define KEY_METER_CALI_ANGLE "meter.cali.angle"
-int cmd_meter_cali_angle(size_t argc, const std::vector<std::string>& argv)
+#define KEY_METER_CALI_ANGLE "meter.angle.cali"
+int cmd_meter_angle_cali(size_t argc, const std::vector<std::string>& argv)
 {
-    manage.page = PAGE_CALI_ANGLE;
     std::string str = "";
-    uint8_t step = std::stoi(argv[0]);
-    if(step < 0 || step > 7){
-        str += "[E]FAIL:step = " + std::to_string(step);
-    }else{
+    // check argc
+    if (argc == 0)return 0x03;
+
+    if(argv[0] == "save"){
+        manage.page = PAGE_CALI_ANGLE;
         String dataString;
         dataString = "";
         dataString += "<";
-        dataString += String(7100 + step);
+        dataString += String(7107);
         dataString += ",";
         dataString += ">";
         Serial1.print(dataString);
-        str += "[D]OK:step = " + std::to_string(step);
+        return 0;
     }
-    Serial.println(str.c_str());
-    // 一定要用return，否则会导致不可恢复bug
+    else if(argv[0] == "record"){
+        manage.page = PAGE_CALI_ANGLE;
+        String dataString;
+        dataString = "";
+        dataString += "<";
+        dataString += String(7108);
+        dataString += ",";
+        dataString += ">";
+        Serial1.print(dataString);
+        return 0;
+    }
+    else if(argv[0] == "reset"){
+        manage.page = PAGE_CALI_ANGLE;
+        String dataString;
+        dataString = "";
+        dataString += "<";
+        dataString += String(7100);
+        dataString += ",";
+        dataString += ">";
+        Serial1.print(dataString);
+        str = "[ACK]reset";
+        Serial.println(str.c_str());
+        return 0;
+    }
+    else {
+        try {
+            int number = std::stoi(argv[0]);
+            if (0 <= number && number <= 6) {
+                manage.page = PAGE_CALI_ANGLE;
+                String dataString;
+                dataString = "";
+                dataString += "<";
+                dataString += String(7100 + number);
+                dataString += ",";
+                dataString += ">";
+                Serial1.print(dataString);
+                str = "[ACK]"+ std::to_string(number);;
+                Serial.println(str.c_str());
+                return 0;
+            }
+        }
+        catch (...) {
+            // 捕获所有异常
+            return 0x04;
+        }
+    }
+    // 如果没有匹配任何条件，则返回错误代码
+    return 0x05;
+}
+
+#define KEY_FLAT_SHOW "meter.flat.show"
+int cmd_meter_flat_show(size_t argc, const std::vector<std::string>& argv)
+{
+    if(argv[0] == "off")manage.flat_debug = 0;
+    else if(argv[0] == "raw")manage.flat_debug = 1;
+    else if(argv[0] == "filt")manage.flat_debug = 2;
     return 0;
 }
 
+#define KEY_UI_PAGE "meter.ui.page"
+int cmd_ui_page(size_t argc, const std::vector<std::string>& argv)
+{   
+    if (argc == 0)return 0x03;
+    try {
+        manage.page = std::stoi(argv[0]);
+        return 0;
+    }
+    catch (...) {
+        // 捕获所有异常
+        return 0x04;
+    }
+    return 0x05;
+}
 
+
+#define KEY_SYSTEM_TYPE "meter.system.type"
+int cmd_system_type(size_t argc, const std::vector<std::string>& argv)
+{
+    std::string ack_str = "";
+    // check argc
+    if (argc == 0)return 0x03;
+    if(argv[0] == "500"){
+        manage.meter_type = METER_TYPE_DEFINE::TYPE_0_5;
+        manage.put_meter_type();
+        ack_str = "[ACK]MeterType: 500";
+        Serial.println(ack_str.c_str());
+        return 0;
+    }
+    else if(argv[0] == "1000"){
+        manage.meter_type = METER_TYPE_DEFINE::TYPE_1_0;
+        manage.put_meter_type();
+        ack_str = "[ACK]MeterType: 1000";
+        Serial.println(ack_str.c_str());
+        return 0;
+    }
+    else if(argv[0] == "2000"){
+        manage.meter_type = METER_TYPE_DEFINE::TYPE_2_0;
+        manage.put_meter_type();
+        ack_str = "[ACK]MeterType: 2000";
+        Serial.println(ack_str.c_str());
+        return 0;
+    }
+    return 0x05;
+}
+
+#define KEY_SYSTEM_MODE "meter.system.mode"
+int cmd_system_mode(size_t argc, const std::vector<std::string>& argv)
+{
+    // check argc
+    if (argc == 0)return 0x03;
+    std::string ack_str = "";
+    if(argv[0] == "0"){
+        manage.debug_mode = 0;
+        ack_str = "[ACK]Mode: Normal";
+        Serial.println(ack_str.c_str());
+        return 0;
+    }
+    else if(argv[0] == "1"){
+        manage.debug_mode = 1;
+        ack_str = "[ACK]Mode: Debug";
+        Serial.println(ack_str.c_str());
+        return 0;
+    }
+    return 0x05;
+}

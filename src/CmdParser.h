@@ -36,7 +36,7 @@ public:
         split(input_str, tokens);
 
         if (tokens.empty()) {
-            return 0;
+            return 0x01;
         }
 
         const std::string& command_key = tokens[0];
@@ -45,9 +45,7 @@ public:
             std::vector<std::string> args(tokens.begin() + 1, tokens.end());
             return it->second(args.size(), args);
         } else {
-            std::string message = "[Unknown] " + input_str;
-            std::cout << message << std::endl;
-            return 0;
+            return 0x02;
         }
     }
 

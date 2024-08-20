@@ -70,12 +70,12 @@ void IMU42688::unpackFromC3(unsigned char info){
       case STEP_PRASE_CALI:
           if(info == '>'){
               cali_rx_buffer[cali_rx_index] = '\0';
-              manage.cali_forward_str = "";
+              manage.angle_msg = "";
               for(int i = 0;i < cali_rx_index;i++){
-                manage.cali_forward_str += cali_rx_buffer[i];
+                manage.angle_msg += cali_rx_buffer[i];
               }
               cali_rx_index = 0;
-              Serial.println(manage.cali_forward_str);
+              Serial.println(manage.angle_msg);
               unpack_step = STEP_FRAME_HEAD;
           }else{
             cali_rx_buffer[cali_rx_index] = info;
@@ -160,7 +160,7 @@ uint8_t IMU42688::Update() {
 
     // Step 3: Read angle_raw and do basic check -----------------------------
     // get imu version
-    manage.imu_version = info_parsed[0];
+    manage.version_imu = info_parsed[0];
     if (Gravity_cope >= 0 && Gravity_cope <= 5) {
       Gravity_cope = info_parsed[7];
     }else{
@@ -222,7 +222,7 @@ uint8_t IMU42688::Update() {
     if(angle_std_show[1] < -90.0f){angle_std_show[1] = angle_std_show[1] + 180.0f;}
     // angle_user_show[1] = fabs(angle_std_show[1]);
     angle_user_show[1] = angle_std_show[1];
-    manage.set_angle_live(angle_user_show[1],arrow);
+    manage.set_clino_live(angle_user_show[1],arrow);
 #ifdef HARDWARE_2_0
   manage.auto_angle = angle_raw[2];
 #else
@@ -304,8 +304,8 @@ void IMU42688::CaliFactoryZero() {
     avg_count = 0;
     memset(&_sum_angle, 0, sizeof(_sum_angle));
     cali_state = IMU_COMPLETE;
-    manage.angle_info = "imu_factory_zero:";
-    manage.angle_info += String(e[1], 2) + ",";
+    manage.angle_msg = "imu_factory_zero:";
+    manage.angle_msg += String(e[1], 2) + ",";
   }
 }
 
@@ -389,7 +389,7 @@ int IMU42688::ProcessMeasureFSM() {
   if (state == M_MEASURE_DONE || state == M_UPLOAD_DONE) {
     if(fabs(measure_source - hold_ref) > un_hold_th){
       onMeasureReset();
-      manage.set_angle_progress(0);
+      manage.set_clino_progress(0);
       return state = M_IDLE;
     }
     return state;
@@ -399,14 +399,14 @@ int IMU42688::ProcessMeasureFSM() {
     if(fabs(measure_source - stable_ref) > un_stable_th){
       onMeasureReset();
       stable_ref = measure_source;
-      manage.set_angle_progress(0);
+      manage.set_clino_progress(0);
       return state = M_UNSTABLE;
     }
     measure_sum += measure_source;
     measure_count++;
-    manage.set_angle_progress(measure_count * 100 / measure_total);
+    manage.set_clino_progress(measure_count * 100 / measure_total);
     if(measure_count == measure_total){
-      manage.hold_clino(measure_sum / measure_total,manage.clino.arrow_live);
+      manage.set_clino_hold(measure_sum / measure_total,manage.clino.arrow_live);
       onMeasureReset();
       hold_ref  = measure_source;
       return state = M_MEASURE_DONE;

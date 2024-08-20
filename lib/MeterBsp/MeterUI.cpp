@@ -8,10 +8,10 @@
  * @copyright Copyright (c) 2024
  * 
  */
-#include "MeterUI.h"
 #include <U8g2lib.h>
-#include "Bitmap_Manage.h"
 #include "MeterManage.h"
+#include "MeterUI.h"
+#include "Bitmap_Manage.h"
 
 #define NUM_LHX 14
 #define NUM_LHY 20
@@ -110,7 +110,8 @@ void MeterUI::TurnOff() {
 U8G2_ST7567_JLX12864_F_4W_SW_SPI screen_h(U8G2_R2, /*CLK*/ 12, /*SDA*/ 11,
                                           /*CS*/ 15, /*DC*/ 10, /*RST*/ 41);
 U8G2_ST7539_192X64_F_4W_SW_SPI screen_s(U8G2_R2, /*CLK*/ 12, /*SDA*/ 11,
-                                        /*CS*/ 37, /*DC*/ 13, /*RST*/ 14);                
+                                        /*CS*/ 37, /*DC*/ 13, /*RST*/ 14);
+           
 void MeterUI::TurnOn() {
   if (!screen_h.begin()) {
     ESP_LOGE("screen_h", "screen_h failed");
@@ -156,7 +157,109 @@ void MeterUI::TurnOff() {
   digitalWrite(SCREEN_CS2, HIGH);
   delay(1);
 }
-#endif
+
+void MeterUI::Update() {
+  // do block
+  if(manage.ui_block_info != ""){
+    Block(manage.ui_block_info, 2000);
+    manage.ui_block_info = "";
+    return;
+  }
+  if (block_info != "") {
+    DoBlock();
+    block_info = "";
+    return;
+  }
+  if (millis() < manage.block_time) return;
+  // get param
+  measure_state = manage.measure.state;
+  measure_bar = manage.measure.progress;
+  auto_mode_select = manage.auto_mode_select;
+  dash_num = manage.max_sensor_num;
+  if (measure_state == M_MEASURE_DONE || measure_state == M_UPLOAD_DONE) {
+    angle_show = manage.clino.angle_hold;
+    slope_show = manage.clino.slope_hold;
+    flat_show = manage.flat.flat_hold;
+  } else {
+    angle_show = manage.clino.angle_live;
+    slope_show = manage.clino.slope_live;
+    flat_show = manage.flat.flat_live;
+  }
+  g_this = pIMU->_gravity;
+
+  Flip();
+  Minor_DrawCommon();
+  Minor_DrawArrow();
+  switch (manage.home_mode) {
+    case 0:
+      Minor_DrawAngle();
+      break;
+    case 1:
+      Minor_DrawSlope();
+      break;
+    case 2:
+      Minor_DrawFlat();
+      break;
+    case 3:
+      Minor_DrawFlatSlope();
+      break;
+    default:
+      ESP_LOGE("UI", "home_mode:%d\n\r", manage.home_mode);
+      break;
+  }
+  screen_s.sendBuffer();
+  screen_s.clearBuffer();
+
+  if(g_this == 0 || g_this == 3)screen_h.setDisplayRotation(U8G2_R0);
+  else screen_h.setDisplayRotation(U8G2_R2);
+  if (!hasSwitchHome()){
+    switch (manage.page) {
+      case PAGE_HOME:
+        Primary_DrawHome();
+        Primary_DrawArrow();
+        Primary_DrawCommon();
+        break;
+      case PAGE_BLE:
+        pageSwitchBLE();
+        break;
+      case PAGE_ZERO_MENU:
+        pageCaliMenu();
+        break;
+      case PAGE_ZERO_ANGLE:
+        pageCalAngleCheck();
+        break;
+      case PAGE_ZERO_FLAT:
+        pageCaliFlatCheck();
+        break;
+      case PAGE_ZERO_RESET:
+        pageResetFactoryZero();
+        break;
+      case PAGE_LIGHT_SWITCH:
+        pageSwitchLight();
+        break;
+      case PAGE_INFO:
+        pageInfo(manage.cursor);
+        break;
+      case PAGE_CALI_FLAT:
+        pageRobotCaliFlatness();
+        break;
+      case PAGE_CALI_ANGLE:
+        pageRobotCaliAngle();
+        break;
+      case PAGE_IMU_FACTORY_ZERO:
+        pageImuFactoryZero();
+        break;
+      case PAGE_FLAT_FACTORY_ZERO:
+        pageFlatFactoryZero();
+        break;
+      default:
+        ESP_LOGE("UI", "page:%d\n\r", manage.page);
+        break;
+    }
+  }
+  screen_h.sendBuffer();
+  screen_h.clearBuffer();
+}
 
 void MeterUI::Primary_DrawCommon() {
   screen_h.drawXBM(18, 2, 17, 9, BITMAP_BATTERY);
@@ -271,6 +374,7 @@ void MeterUI::Primary_DrawFlat() {
     screen_h.setDrawColor(1);
   }
 
+#ifdef DEVELOPER_MODE
   screen_h.setFont(u8g2_font_6x12_mr);
   for(int i = 0; i < 8; i++){
     if(pDS->sensor_valid[i]){
@@ -281,6 +385,7 @@ void MeterUI::Primary_DrawFlat() {
     }
   }
   screen_h.setDrawColor(1);
+#endif
   
   if (flat_show > 50.0f) {
     screen_h.drawXBM(LINE_LHX, LINE_LHY, 45, 3, Main_Dash_45x3);
@@ -430,6 +535,7 @@ void MeterUI::Minor_DrawFlat() {
       screen_s.setDrawColor(1);
     }
 
+#ifdef DEVELOPER_MODE
     screen_s.setFont(u8g2_font_6x12_mr);
     for(int i = 0; i < 8; i++){
       if(pDS->sensor_valid[i]){
@@ -439,8 +545,9 @@ void MeterUI::Minor_DrawFlat() {
         screen_s.drawStr(37 + 7 * i, 10,String(i + 1).c_str());
       }
     }
-    
     screen_s.setDrawColor(1);
+#endif
+
     if (flat_show > 50.0f) {
       screen_s.drawXBM(LINE_LHX, LINE_LHY, 45, 3, Main_Dash_45x3);
     } else {
@@ -563,34 +670,28 @@ void MeterUI::Minor_DrawArrow() {
 void MeterUI::pageSwitchLight() {
   if (manage.warn_light_onoff == true) {
     manage.warn_light_onoff = false;
-    // manage.warrning_mode =  WARN_ON_LIGHT_OFF;
-    // manage.put_warrning_light();
-    // screen_h.drawXBM(0, 0, 128, 64, BITMAP_BLOCK_LIGHT_OFF);
-    // manage.block_time = millis() + 1000;
-    manage.flat_abs = false;
-    Block("Relative_Flatness",1000);
+    manage.put_warn_light();
+    screen_h.drawXBM(0, 0, 128, 64, BITMAP_BLOCK_LIGHT_OFF);
+    manage.block_time = millis() + 1000;
     manage.page = PAGE_HOME;
   } else {
     manage.warn_light_onoff = true;
-    // manage.warrning_mode = WARN_ON_LIGHT_ON;
-    // manage.put_warrning_light();
-    // screen_h.drawXBM(0, 0, 128, 64, BITMAP_BLOCK_LIGHT_ON);
-    // manage.block_time = millis() + 1000;
-    manage.flat_abs = true;
-    Block("Absolute_Flatness",1000);
+    manage.put_warn_light();
+    screen_h.drawXBM(0, 0, 128, 64, BITMAP_BLOCK_LIGHT_ON);
+    manage.block_time = millis() + 1000;
     manage.page = PAGE_HOME;
   }
 }
 
 void MeterUI::pageSwitchBLE() {
-  if (manage.if_ble_switch) {
+  if (manage.has_ble_switch) {
     if (*(pBLEState + 7) == true) {
-      manage.if_ble_switch = false;
+      manage.has_ble_switch = false;
       screen_h.drawXBM(0, 0, 128, 64, BITMAP_BLOCK_BLE_ON);
       manage.block_time = millis() + 1000;
       manage.page = PAGE_HOME;
     } else {
-      manage.if_ble_switch = false;
+      manage.has_ble_switch = false;
       screen_h.drawXBM(0, 0, 128, 64, BITMAP_BLOCK_BLE_OFF);
       manage.block_time = millis() + 1000;
       manage.page = PAGE_HOME;
@@ -639,7 +740,6 @@ void MeterUI::pageAutoCaliFlatness() {
   screen_h.drawBox(19, 55, manage.flat.progress * 0.9, 3);
 }
 
-
 void MeterUI::pageRobotCaliFlatness() {
   screen_h.setFont(u8g2_font_helvB10_tr);
   screen_h.drawStr(0, 14, "Flat Robot Cali");
@@ -667,7 +767,7 @@ void MeterUI::pageRobotCaliAngle() {
   screen_h.drawXBM(18, 54, 92, 6, bitmap_h_loading);
   screen_h.drawBox(19, 55, manage.flat.progress * 0.9, 3);
 }
-void MeterUI::pageOption_YesNo(bool option) {
+void MeterUI::pageOptionYesNo(bool option) {
   char S1[4] = "No";
   char S2[4] = "Yes";
   screen_h.setFont(u8g2_font_7x14B_tr);
@@ -685,7 +785,7 @@ void MeterUI::pageCalAngleCheck() {
   // YES_NO确认界面
   if (pIMU->cali_state == IMU_COMMON) {
     screen_h.drawStr(0, 15, "AngleCali Ready?");
-    pageOption_YesNo(pIMU->yes_no);
+    pageOptionYesNo(pIMU->yes_no);
   }
   // 采集数据页面
   else if (pIMU->cali_state == IMU_CALI_ZERO) {
@@ -700,7 +800,7 @@ void MeterUI::pageImuFactoryZero() {
   // YES_NO确认界面
   if (pIMU->cali_state == IMU_COMMON) {
     screen_h.drawStr(0, 15, "AngleFactoryReady!!!?");
-    pageOption_YesNo(pIMU->yes_no);
+    pageOptionYesNo(pIMU->yes_no);
   }
   // 采集数据页面
   else if (pIMU->cali_state == IMU_FACTORY_ZERO) {
@@ -715,7 +815,7 @@ void MeterUI::pageCaliFlatCheck() {
   // YES_NO确认界面
   if (manage.flat.state == FLAT_COMMON) {
     screen_h.drawStr(0, 15, "FlatCali Ready?");
-    pageOption_YesNo(pDS->yes_no);
+    pageOptionYesNo(pDS->yes_no);
   }
   // 采集数据页面
   else if (manage.flat.state == FLAT_CALI_ZERO) {
@@ -729,13 +829,13 @@ void MeterUI::pageResetFactoryZero() {
   screen_h.setFont(u8g2_font_7x14B_tr);
   if (manage.reset_state == 0) {
     screen_h.drawStr(0, 15, "ResetFactoryReady?");
-    pageOption_YesNo(manage.reset_yesno);
+    pageOptionYesNo(manage.ui_yes_no);
   }
   // 采集数据页面
   else if (manage.reset_state == 1) {
     screen_h.drawStr(0, 15, "ResetFactoryGoing!");
     screen_h.drawFrame(12, 50, 104, 14);
-    screen_h.drawBox(14, 52, manage.reset_progress, 10);
+    screen_h.drawBox(14, 52, manage.ui_progress, 10);
   }
 }
 
@@ -744,7 +844,7 @@ void MeterUI::pageFlatFactoryZero() {
   // YES_NO确认界面
   if (manage.flat.state == FLAT_COMMON) {
     screen_h.drawStr(0, 15, "FlatFactory Ready?");
-    pageOption_YesNo(pDS->yes_no);
+    pageOptionYesNo(pDS->yes_no);
   }
   // 采集数据页面
   else if (manage.flat.state == FLAT_FACTORY_ZERO) {
@@ -813,11 +913,11 @@ void MeterUI::pageInfo(int selection) {
       screen_h.drawStr(2, 8, "EmptyPAGE:");
       screen_h.drawStr(70,8, String(selection).c_str());
       screen_h.drawStr(2, 18, "SOFTWARE:");
-      screen_h.drawStr(70,18, String(manage.ver_software).c_str());
+      screen_h.drawStr(70,18, String(manage.version_software).c_str());
       screen_h.drawStr(2, 28, "HARDWARE:");
-      screen_h.drawStr(70,28, String(manage.ver_hardware).c_str());
+      screen_h.drawStr(70,28, String(manage.version_hardware).c_str());
       screen_h.drawStr(2, 38, "IMU:");
-      screen_h.drawStr(70,38, String(manage.imu_version).c_str());
+      screen_h.drawStr(70,38, String(manage.version_imu).c_str());
       screen_h.drawStr(2, 48, "Battery:");
       screen_h.drawStr(70,48, String(*pBattry).c_str());
       screen_h.drawStr(2, 58, "Battery:");
@@ -868,8 +968,14 @@ void MeterUI::pageImuInfo() {
   screen_h.drawStr(76, 62, E);
 }
 
+void MeterUI::pageRobotCali() {
+  screen_h.setFont(u8g2_font_7x13B_tr);
+  screen_h.drawStr(2, 10, "RobotCali:");
+  char str[7] = "-----";
+  dtostrf(manage.flat_height_level, 7, 2, str);
+  drawNum_16x24(NUM_LHX, NUM_LHY, str, 7);
+}
 void MeterUI::Flip() {
-  g_this = pIMU->_gravity;
   rotation = (g_this % 3 == 0) ? 0 : 1;
 #ifdef HARDWARE_2_0
   if (g_last != g_this) {
@@ -939,17 +1045,16 @@ void MeterUI::Flip() {
 #endif
 }
 
-bool MeterUI::ifSwitchHome() {
+bool MeterUI::hasSwitchHome() {
   if (manage.pre_home_mode != manage.home_mode) {
     manage.pre_home_mode = manage.home_mode;
     screen_h.drawXBM(0, 0, 128, 64, bitmap_cover[manage.home_mode]);
-    manage.block_time = millis() + 1000;
+    manage.block_time = millis() + 500;
     return true;
   }
   manage.pre_home_mode = manage.home_mode;
   return false;
 }
-
 
 void MeterUI::Block(String Info, int time) {
   block_info = Info;
@@ -1075,111 +1180,4 @@ void MeterUI::Minor_drawNum_16x24(int x, int y, String str, int size) {
   }
 }
 
-void MeterUI::Update() {
-  // do block
-  if(manage.ui_info != ""){
-    Block(manage.ui_info, 2000);
-    manage.ui_info = "";
-    return;
-  }
-  if (block_info != "") {
-    DoBlock();
-    block_info = "";
-    return;
-  }
-  if (millis() < manage.block_time) return;
-  // get param
-  measure_state = manage.measure.state;
-  measure_bar = manage.measure.progress;
-  if (measure_state == M_MEASURE_DONE || measure_state == M_UPLOAD_DONE) {
-    angle_show = manage.clino.angle_hold;
-    slope_show = manage.clino.slope_hold;
-    flat_show = manage.flat.flat_hold;
-  } else {
-    angle_show = manage.clino.angle_live;
-    slope_show = manage.clino.slope_live;
-    flat_show = manage.flat.flat_live;
-  }
-  auto_mode_select = manage.auto_mode_select;
-  dash_num = manage.dash_num;
-
-  Flip();
-  Minor_DrawCommon();
-  Minor_DrawArrow();
-  switch (manage.home_mode) {
-    case 0:
-      Minor_DrawAngle();
-      break;
-    case 1:
-      Minor_DrawSlope();
-      break;
-    case 2:
-      Minor_DrawFlat();
-      break;
-    case 3:
-      Minor_DrawFlatSlope();
-      break;
-    default:
-      ESP_LOGE("MinorHome", "home_mode:%d", manage.home_mode);
-      break;
-  }
-  screen_s.sendBuffer();
-  screen_s.clearBuffer();
-
-  screen_h.setDisplayRotation(U8G2_R2);
-  if (ifSwitchHome() == false) {
-    switch (manage.page) {
-      case PAGE_HOME:
-        Primary_DrawArrow();
-        Primary_DrawCommon();
-        Primary_DrawHome();
-        break;
-      case PAGE_BLE:
-        pageSwitchBLE();
-        break;
-      case PAGE_ZERO_MENU:
-        pageCaliMenu();
-        break;
-      case PAGE_ZERO_ANGLE:
-        pageCalAngleCheck();
-        break;
-      case PAGE_ZERO_FLAT:
-        pageCaliFlatCheck();
-        break;
-      case PAGE_ZERO_RESET:
-        pageResetFactoryZero();
-        break;
-      case PAGE_LIGHT_SWITCH:
-        pageSwitchLight();
-        break;
-      case PAGE_INFO:
-        pageInfo(manage.cursor);
-        break;
-      case PAGE_CALI_FLAT:
-        pageRobotCaliFlatness();
-        break;
-      case PAGE_CALI_ANGLE:
-        pageRobotCaliAngle();
-        break;
-      case PAGE_IMU_FACTORY_ZERO:
-        pageImuFactoryZero();
-        break;
-      case PAGE_FLAT_FACTORY_ZERO:
-        pageFlatFactoryZero();
-        break;
-      default:
-        ESP_LOGE("UI", "page:%d\r\n", manage.page);
-        break;
-    }
-  }
-  screen_h.sendBuffer();
-  screen_h.clearBuffer();
-}
-
-void MeterUI::pageRobotCali() {
-  screen_h.setFont(u8g2_font_7x13B_tr);
-  screen_h.drawStr(2, 10, "RobotCali:");
-  char str[7] = "-----";
-  dtostrf(manage.flat_height_level, 7, 2, str);
-  drawNum_16x24(NUM_LHX, NUM_LHY, str, 7);
-}
+#endif // METER_UI

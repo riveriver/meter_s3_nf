@@ -44,7 +44,7 @@ private:
     void pageSwitchLight();
     void pageAngleCaliInfo();
     void pageImuFactoryZero();
-    void pageOption_YesNo(bool option);
+    void pageOptionYesNo(bool option);
     void pageImuInfo();
     void pageInfo(int selection);
     void pageCalAngleCheck();
@@ -56,7 +56,7 @@ private:
     void pageRobotCaliFlatness();
     void pageRobotCaliAngle();
     /* ----- Home ----- */
-    bool ifSwitchHome();
+    bool hasSwitchHome();
     void Primary_DrawCommon();
     void Primary_DrawArrow(); 
     void Primary_DrawAngle();

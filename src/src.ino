@@ -13,7 +13,7 @@
 #include "BLE.h"
 #include "CommProtocol.h"
 extern BLE ble;
-StringCmdParser cmd_parser(",");
+StringCmdParser cmd_parser(" ");
 Meter manage;
 Flatness flat;
 IMU42688 imu;
@@ -52,9 +52,7 @@ void setup() {
   while (digitalRead(IO_Button0)) {
   }
 
-#ifdef UI_ON
   xTaskCreatePinnedToCore(ui_task, "ui_task", 16384, NULL, 5, ui_handle,1);
-#endif
   xTaskCreatePinnedToCore(flat_measure_task, "flat_measure_task", 16384, NULL, 4, flat_handle, 0);
   xTaskCreatePinnedToCore(angle_measure_task, "angle_measure_task", 16384, NULL, 4, angle_handle, 0);
   xTaskCreatePinnedToCore(comm_task, "comm_task", 8192, NULL, 3, comm_handle, 0);
@@ -73,8 +71,13 @@ void loop() {}
 
 static void comm_task(void *pvParameter) {
   ble.Init();
-  cmd_parser.register_cmd(KEY_METER_CALI_FLAT,cmd_robot_cali_flat);
-  cmd_parser.register_cmd(KEY_METER_CALI_ANGLE,cmd_meter_cali_angle);
+  cmd_parser.register_cmd(KEY_METER_CALI_FLAT,cmd_meter_flat_cali);
+  cmd_parser.register_cmd(KEY_METER_CALI_ANGLE,cmd_meter_angle_cali);
+  cmd_parser.register_cmd(KEY_FLAT_SHOW,cmd_meter_flat_show);
+  cmd_parser.register_cmd(KEY_UI_PAGE,cmd_ui_page);
+  cmd_parser.register_cmd(KEY_SYSTEM_TYPE,cmd_system_type);
+  cmd_parser.register_cmd(KEY_SYSTEM_MODE,cmd_system_mode);
+  
   bool last_state = false;
   unsigned long slow_sync = millis();
   BaseType_t xWasDelayed;
@@ -91,8 +94,7 @@ static void comm_task(void *pvParameter) {
     if(ble.state.is_connect == true && manage.measure.state == M_MEASURE_DONE){
       // app mode process
       byte app_home = manage.home_mode;
-      // auto mode
-      if(app_home == HOME_SLOPE_FLATNESS){
+      if(app_home == HOME_AUTO){
         if(manage.auto_mode_select == HOME_AUTO_SLOPE){
           app_home = HOME_SLOPE;
         }else if(manage.auto_mode_select == HOME_AUTO_FLATNESS){
@@ -123,7 +125,9 @@ static void comm_task(void *pvParameter) {
     {
       String rx_str = "";
       rx_str =  Serial.readStringUntil('\n');
-      cmd_parser.parse(rx_str.c_str()); // call command parser
+      if(cmd_parser.parse(rx_str.c_str()) != 0){
+        Serial.println("[E]" + rx_str);
+      }
     }
     
     xLastWakeTime = xTaskGetTickCount();
@@ -157,19 +161,19 @@ static void angle_measure_task(void *pvParameter) {
       default:
         manage.clino.measure.state = imu.ProcessMeasureFSM();
         manage.flat.measure.state = flat.ProcessMeasureFSM();
-        if(manage.home_mode == HOME_SLOPE_FLATNESS){
+        if(manage.home_mode == HOME_AUTO){
           if((manage.auto_angle > -95 && manage.auto_angle < -85) 
           || (manage.auto_angle > 85 && manage.auto_angle < 95)){
             manage.auto_mode_select = HOME_AUTO_SLOPE;
           }
           else{manage.auto_mode_select = HOME_AUTO_FLATNESS;}
         }
-        manage.updateSystem();
+        manage.updateMeasure();
         break;
       }
     }
 
-    // manage.WarningLightFSM();
+    manage.WarningLightFSM();
     xLastWakeTime = xTaskGetTickCount();
     xWasDelayed = xTaskDelayUntil(&xLastWakeTime, 200);
     if (!xWasDelayed && millis() > 10000){

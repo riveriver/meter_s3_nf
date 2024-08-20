@@ -51,6 +51,7 @@ public:
     float stable_ref = 0;
     float measure_sum = 0;
     float max_dist_num = 0;
+    int stable_count  = 0;
 void  init();
     /*****************************************************************************************************
      * Measure
