@@ -285,7 +285,6 @@ int Flatness::ProcessMeasureFSM() {
     }
     return state;
   }
-  Serial.printf("refer_peak:%f\r\n",refer_peak);
   if (refer_peak > 30) {
     measure_count = 0;
     return state = M_UNSTABLE;
@@ -432,18 +431,21 @@ void Flatness::doRobotArmCali() {
   // progress
   stable_count++;
   if(stable_count == 20){
-  for (int i = 0; i < SENSOR_NUM; i++){fit_x[i] += filt[i];}
-    manage.flat.progress += 20;
+  for(int i = 0; i < SENSOR_NUM; i++){fit_x[i] += filt[i];}
+    manage.flat.progress += 50;
     stable_count = 0;
   }
   
   // check finish
   if(manage.flat.progress == 100){
-    str = "cali.flat.pct 100";
-    Serial.println(str);
+    for (int i = 0; i < SENSOR_NUM; i++) {
+      map_x[i][step] = fit_x[i] / 2;
+    }
     manage.flat.progress = 0;
     manage.flat.cali.step = 99;
     manage.flat.state = FLAT_COMMON;
+    str = "cali.flat.pct 100";
+    Serial.println(str);
   }
 }
 

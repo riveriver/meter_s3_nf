@@ -300,7 +300,7 @@ void WarningLightFSM(){
         }
       }
     }
-    ControlWarningLight(2);
+    // ControlWarningLight(2);
   }
   else {
     ControlWarningLight(0);

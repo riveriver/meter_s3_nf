@@ -493,7 +493,6 @@
                 "TYPE_2000",
                 "HARDWARE_3_0",
                 "SENSOR_1_4",
-                "DEVELOPER_MODE",
                 "HAVE_CONFIG_H",
                 "MBEDTLS_CONFIG_FILE=\"mbedtls/esp_config.h\"",
                 "UNITY_INCLUDE_CONFIG_H",

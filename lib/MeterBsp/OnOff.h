@@ -80,8 +80,8 @@ public:
     void Off_Clock_Check()
     {
         bool CommandSleep = (off_count == 0) ? false : (millis() - off_count) > on_time;
-        // bool AutoSleep = ((millis() - last_active > manage.sleep_time * 60 * 1000) && millis() > manage.sleep_time * 60 * 1000);
-        bool AutoSleep = 0;
+        bool AutoSleep = ((millis() - last_active > manage.sleep_time * 60 * 1000) && millis() > manage.sleep_time * 60 * 1000);
+        // bool AutoSleep = 0;
         if (!CommandSleep && !AutoSleep)return;
         if (CommandSleep)
         {
