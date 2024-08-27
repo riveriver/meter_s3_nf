@@ -83,7 +83,7 @@ int cmd_meter_angle_cali(size_t argc, const std::vector<std::string>& argv)
 
     if(argv[0] == "name"){
         manage.page = PAGE_CALI_ANGLE;
-        str = "[ACK]reset";
+        str = "[Master_ACK]" + argv[0];
         Serial.println(str.c_str());
         return 0;
     }
@@ -118,7 +118,7 @@ int cmd_meter_angle_cali(size_t argc, const std::vector<std::string>& argv)
         dataString += ",";
         dataString += ">";
         Serial1.print(dataString);
-        str = "[ACK]reset";
+        str = "[Master_ACK]" + argv[0];
         Serial.println(str.c_str());
         return 0;
     }
@@ -134,7 +134,7 @@ int cmd_meter_angle_cali(size_t argc, const std::vector<std::string>& argv)
                 dataString += ",";
                 dataString += ">";
                 Serial1.print(dataString);
-                str = "[ACK]"+ std::to_string(number);;
+                str = "[Master_ACK]"+ std::to_string(number);;
                 Serial.println(str.c_str());
                 return 0;
             }
@@ -155,6 +155,24 @@ int cmd_meter_flat_show(size_t argc, const std::vector<std::string>& argv)
     else if(argv[0] == "raw")manage.flat_debug = 1;
     else if(argv[0] == "filt")manage.flat_debug = 2;
     return 0;
+}
+
+#define KEY_SYS_SHOW "meter.sys.show"
+int cmd_meter_sys_show(size_t argc, const std::vector<std::string>& argv)
+{
+    if (argc == 0)return 0x03;
+    try {
+        if(argv[0] == "name"){
+            String str = "Device:" + manage.local_name;
+            Serial.println(str.c_str());
+        }
+        return 0;
+    }
+    catch (...) {
+        // 捕获所有异常
+        return 0x04;
+    }
+    return 0x05;
 }
 
 #define KEY_UI_PAGE "meter.ui.page"

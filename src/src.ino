@@ -77,6 +77,7 @@ static void comm_task(void *pvParameter) {
   cmd_parser.register_cmd(KEY_UI_PAGE,cmd_ui_page);
   cmd_parser.register_cmd(KEY_SYSTEM_TYPE,cmd_system_type);
   cmd_parser.register_cmd(KEY_SYSTEM_MODE,cmd_system_mode);
+  cmd_parser.register_cmd(KEY_SYS_SHOW,cmd_meter_sys_show);
   
   bool last_state = false;
   unsigned long slow_sync = millis();
