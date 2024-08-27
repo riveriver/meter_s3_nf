@@ -19,6 +19,7 @@ class Meter{
 private:
 public:
   byte debug_mode = 0;
+  String local_name = "Ensightful";
   /* measure */
   Measure measure;
   /* angel */
@@ -99,6 +100,15 @@ byte meter_type = TYPE_2_0;
     warn_flat = pref.getFloat("WarnFlat",0);
     sleep_time = pref.getInt("Sleep",15);
     pref.end();
+    if (meter_type == METER_TYPE_DEFINE::TYPE_0_5) {
+      local_name = "Ensightful_500_";
+    } else if (meter_type == METER_TYPE_DEFINE::TYPE_1_0) {
+      local_name = "Ensightful_1000_";
+    } else if (meter_type == METER_TYPE_DEFINE::TYPE_2_0) {
+      local_name = "Ensightful_2000_";
+    } else {
+      local_name = "Ensightful_";
+    }
     // go to home
     home_size = (meter_type > 10) ? 4 : 2;
     home_mode = home_mode % home_size;

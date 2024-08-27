@@ -32,7 +32,7 @@ int cmd_meter_flat_cali(size_t argc, const std::vector<std::string>& argv)
             manage.flat.cali.step = CALI_STEP::SAVE;
             manage.flat.state = FLAT_ROBOT_ARM_CALI;
             manage.page = PAGE_CALI_FLAT;
-            str = "[ACK]save";
+            str = "[Master_ACK]" + argv[0];
             Serial.println(str.c_str());
             return 0;
         }
@@ -42,13 +42,13 @@ int cmd_meter_flat_cali(size_t argc, const std::vector<std::string>& argv)
             manage.flat.cali.step = CALI_STEP::ECHO;
             manage.flat.state = FLAT_ROBOT_ARM_CALI;
             manage.page = PAGE_CALI_FLAT;
-            str = "[ACK]record";
+            str = "[Master_ACK]" + argv[0];
             Serial.println(str.c_str());
             return 0;
         }
     } else if (argv[0] == "reset") {
         manage.flat.state = FLAT_COMMON;
-        str = "[ACK]reset";
+        str = "[Master_ACK]" + argv[0];
         Serial.println(str.c_str());
         return 0;
     } else {
@@ -58,7 +58,7 @@ int cmd_meter_flat_cali(size_t argc, const std::vector<std::string>& argv)
                 if (manage.flat.state == FLAT_COMMON) {
                     manage.flat.cali.step = number;
                     manage.flat.state = FLAT_ROBOT_ARM_CALI;
-                    str = "[ACK]step(mm)= " + std::to_string(manage.flat.cali.step);
+                    str = "[Master_ACK]step(mm) = " + std::to_string(manage.flat.cali.step);
                     Serial.println(str.c_str());
                     manage.page = PAGE_CALI_FLAT;
                     return 0;
@@ -81,7 +81,13 @@ int cmd_meter_angle_cali(size_t argc, const std::vector<std::string>& argv)
     // check argc
     if (argc == 0)return 0x03;
 
-    if(argv[0] == "save"){
+    if(argv[0] == "name"){
+        manage.page = PAGE_CALI_ANGLE;
+        str = "[ACK]reset";
+        Serial.println(str.c_str());
+        return 0;
+    }
+    else if(argv[0] == "save"){
         manage.page = PAGE_CALI_ANGLE;
         String dataString;
         dataString = "";

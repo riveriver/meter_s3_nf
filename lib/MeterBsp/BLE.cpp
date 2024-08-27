@@ -2,22 +2,12 @@
 BLE ble;
 void BLE::Init() {
   // Start BLE Deviec ----------------------------------------
-  BLEDevice::init("Ensightful");
-  std::string name_char;
-  if (manage.meter_type == METER_TYPE_DEFINE::TYPE_0_5) {
-    name_char = "Ensightful_500_";
-  } else if (manage.meter_type == METER_TYPE_DEFINE::TYPE_1_0) {
-    name_char = "Ensightful_1000_";
-  } else if (manage.meter_type == METER_TYPE_DEFINE::TYPE_2_0) {
-    name_char = "Ensightful_2000_";
-  } else {
-    name_char = "Ensightful_";
-  }
-  std::string macAddress =
-      BLEDevice::getAddress().toString();
-  name_char =
-      name_char + macAddress.substr(macAddress.length() - 5);;
-  BLEDevice::setDeviceName(name_char.c_str()); 
+  BLEDevice::init("Ensightful_"); 
+  String mac_addr = BLEDevice::getAddress().toString().c_str();
+  mac_addr = mac_addr.substring(mac_addr.length() - 5);
+  mac_addr.toUpperCase();
+  manage.local_name += mac_addr;
+  BLEDevice::setDeviceName(manage.local_name.c_str()); 
   memcpy(state.addr, BLEDevice::getAddress().getNative(), sizeof(state.addr));
 
   // Create Server --------------------------------------------
