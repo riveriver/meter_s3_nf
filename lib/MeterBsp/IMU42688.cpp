@@ -74,8 +74,8 @@ void IMU42688::unpackFromC3(unsigned char info){
               for(int i = 0;i < cali_rx_index;i++){
                 manage.angle_msg += cali_rx_buffer[i];
               }
-              cali_rx_index = 0;
               Serial.println(manage.angle_msg);
+              cali_rx_index = 0;
               unpack_step = STEP_FRAME_HEAD;
           }else{
             cali_rx_buffer[cali_rx_index] = info;

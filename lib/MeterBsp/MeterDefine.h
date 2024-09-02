@@ -90,8 +90,9 @@ enum SPEED_MODE_DEFINE {
 
 enum CALI_STEP{
   SAVE  = 11,
-  ECHO  = 12,
+  RECORD  = 12,
   RESET = 13,
+  ECHO = 14,
 };
 
 struct Measure{
@@ -100,9 +101,10 @@ struct Measure{
 };
 
 struct Calibration{
-  byte step = 0;
+  int8_t step = 0;
   byte status = 0;
   byte rr = 0;
+  float record_num = 0.0;
   float peak_avg = 0;
 };
 

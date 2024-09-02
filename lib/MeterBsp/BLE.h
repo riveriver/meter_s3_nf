@@ -23,11 +23,14 @@ public:
 };
 
 class ControlCallbacks : public BLECharacteristicCallbacks {
-  void onSubscribe(NimBLECharacteristic *pCharacteristic);
+  void onSubscribe(NimBLECharacteristic *pCharacteristic,
+                    ble_gap_conn_desc *desc, uint16_t subValue);
   void onWrite(NimBLECharacteristic *pCharacteristic);
 };
 
 class DeveloperCallbacks : public BLECharacteristicCallbacks {
+  void onSubscribe(NimBLECharacteristic *pCharacteristic,
+                    ble_gap_conn_desc *desc, uint16_t subValue);
   void onWrite(NimBLECharacteristic *pCharacteristic);
 };
 

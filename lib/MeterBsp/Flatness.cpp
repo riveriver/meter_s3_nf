@@ -310,14 +310,14 @@ void Flatness::mapDist(int id, float x) {
     // 
     int start = 0;
     int end = MAP_NUM;
-    // 小于0cm默认为0cm
-    if(x > map_x[id][0]){
+    // 小于1mm默认为0mm
+    if(x > map_x[id][1]){
       dist[id] = dist_map[id] = dist_linear[id] = 0;
       return;
     }
-    // 大于10cm，线性插值计算距离
+    // 大于10mm，线性插值计算距离
     if(x < map_x[id][MAP_NUM - 1]){
-      dist[id] = dist_map[id] = dist_linear[id] =  map_y[MAP_NUM - 1] +  (map_x[id][MAP_NUM - 1] - x)/100;
+      dist[id] = dist_map[id] = dist_linear[id] =  map_y[MAP_NUM - 1] +  (map_x[id][MAP_NUM - 1] - x)/200;
       return;
     }
     // 二分法查找区间：直到 start > end，此时搜索结束，表明目标值不在列表中，但我们已经找到了它所在的两个相邻x值区间
@@ -378,35 +378,52 @@ void Flatness::doRobotArmCali() {
   byte step = manage.flat.cali.step;
   
   if(step == CALI_STEP::SAVE){
-    manage.flat.state = FLAT_COMMON;
-    manage.flat.cali.step = 0;
     putFitParams();
     String str = "";
       for(int i = 0; i < 8; ++i) {
-          str += String(i) + "mm:";
+          str = String(i) + "flat.cali.param ";
+          str += String(i) + ",";
           for(int j = 0; j < MAP_NUM; ++j) {
               str += String(map_x[i][j],0);
-              if (j < MAP_NUM - 1) str += ", ";
+              if (j < MAP_NUM - 1) str += ",";
           }
-          str += "\n\r"; 
+          Serial.println(str);
     }
-    Serial.println(str);
+    manage.flat.state = FLAT_COMMON;
+    manage.flat.cali.step = -1;
     return;
   }
 
   if(step == CALI_STEP::ECHO){
-    manage.flat.state = FLAT_COMMON;
-    manage.flat.cali.step = 0;
     String str = "";
       for(int i = 0; i < 8; ++i) {
-          str += String(i) + "mm:";
+          str = String(i) + "flat.cali.data ";
+          str += String(i) + ",";
           for(int j = 0; j < MAP_NUM; ++j) {
               str += String(map_x[i][j],0);
-              if (j < MAP_NUM - 1) str += ", ";
+              if (j < MAP_NUM - 1) str += ",";
           }
-          str += "\n\r"; 
+          Serial.println(str);
     }
     Serial.println(str);
+    manage.flat.progress = 0;
+    manage.flat.cali.record_num = 0.0;
+    manage.flat.state = FLAT_COMMON;
+    manage.flat.cali.step = -1;
+    return;
+  }
+
+  if(step == CALI_STEP::RECORD){
+    String str ="flat.cali.qcqa " + String(manage.flat.cali.record_num,1) + ",";
+      for(int i = 0; i < SENSOR_NUM; i++) {
+              str += String(dist[i],1);
+              if (i < SENSOR_NUM - 1) str += ",";
+    }
+    Serial.println(str);
+    manage.flat.progress = 0;
+    manage.flat.cali.record_num = 0.0;
+    manage.flat.state = FLAT_COMMON;
+    manage.flat.cali.step = -1;
     return;
   }
 
@@ -415,7 +432,6 @@ void Flatness::doRobotArmCali() {
     for (int i = 0; i < SENSOR_NUM; i++)fit_x[i] = 0;
   }
 
-  String str = String(step) + "mm:";
   // check stable
   float max = 0;
   for (int i = 0; i < SENSOR_NUM; i++) {
@@ -438,14 +454,16 @@ void Flatness::doRobotArmCali() {
   
   // check finish
   if(manage.flat.progress == 100){
-    for (int i = 0; i < SENSOR_NUM; i++) {
-      map_x[i][step] = fit_x[i] / 2;
-    }
-    manage.flat.progress = 0;
-    manage.flat.cali.step = 99;
-    manage.flat.state = FLAT_COMMON;
-    str = "cali.flat.pct 100";
-    Serial.println(str);
+
+  for (int i = 0; i < SENSOR_NUM; i++) {
+    map_x[i][step] = fit_x[i] / 2;
+  }
+  String str = "flat.cali.cpct 100";
+  Serial.println(str);
+  manage.flat.progress = 0;
+  manage.flat.cali.step = -1;
+  manage.flat.state = FLAT_COMMON;
+
   }
 }
 
@@ -477,7 +495,7 @@ void Flatness::putFitParams() {
   stores.begin("FIT", false);
   String key = "";
   for(int i = 0; i < SENSOR_NUM; i++){
-    for(int j = 0; j < 11; j++){
+    for(int j = 0; j < MAP_NUM; j++){
       key = String(i) + String(j);
       stores.putFloat(key.c_str(),map_x[i][j]);
     }

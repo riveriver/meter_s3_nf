@@ -69,8 +69,6 @@ void Button::Update() {
         manage.page = PAGE_ZERO_MENU;
       }
       else if(Press_Power) {
-        manage.resetMeasure();
-        manage.cursor = 0;
   #ifdef HARDWARE_2_0
     manage.page = PAGE_ZERO_MENU;
   #endif

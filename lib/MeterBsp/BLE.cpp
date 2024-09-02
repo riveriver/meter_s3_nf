@@ -1,4 +1,5 @@
 #include "BLE.h"
+
 BLE ble;
 void BLE::Init() {
   // Start BLE Deviec ----------------------------------------
@@ -6,6 +7,7 @@ void BLE::Init() {
   String mac_addr = BLEDevice::getAddress().toString().c_str();
   mac_addr = mac_addr.substring(mac_addr.length() - 5);
   mac_addr.toUpperCase();
+  manage.local_id = mac_addr;
   manage.local_name += mac_addr;
   BLEDevice::setDeviceName(manage.local_name.c_str()); 
   memcpy(state.addr, BLEDevice::getAddress().getNative(), sizeof(state.addr));
@@ -34,10 +36,8 @@ void BLE::Init() {
       StatusUUID, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY);
   HomeChar = pService->createCharacteristic(
       HomeUUID, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY);
-  ControlChar = pService->createCharacteristic(
-      ControlUUID,
-      NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY,
-      128);
+  ControlChar = pService->createCharacteristic(ControlUUID,
+      NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY);
   DeveloperChar = pService->createCharacteristic(
       DeveloperUUID,
       NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY,
@@ -148,10 +148,14 @@ void BLE::DoSwitch() {
 
 void BLE::sendSyncInfo() {
   // version_info
-  ControlChar->setValue(manage.version_software + VERSION_SOFTWARE_BASE * 1000);
+  int soft_ver = manage.version_software + VERSION_SOFTWARE_BASE * 1000;
+  int hard_ver = manage.version_hardware + VERSION_HARDWARE_BASE * 1000;
+  ControlChar->setValue(soft_ver);
   ControlChar->notify(true);
-  ControlChar->setValue(manage.version_hardware + VERSION_HARDWARE_BASE * 1000);
+  ESP_LOGE("","soft_verL:%d",soft_ver);
+  ControlChar->setValue(hard_ver);
   ControlChar->notify(true);
+  ESP_LOGE("","hard_ver:%d",hard_ver);
   ControlChar->setValue(manage.battery);
   ControlChar->notify(true);
   ControlChar->setValue(manage.meter_type + METER_TYPE_BASE * 1000);
@@ -288,11 +292,11 @@ void BLE::parseSyncInfo(int info) {
     case SLOPE_STD_BASE:
       if (huns == 0) {
         if (ones == 0) {
-          manage.slope_standard = 1000.0f;
+          manage.slope_std = 1000.0f;
         } else if (ones == 1) {
-          manage.slope_standard = 1200.0f;
+          manage.slope_std = 1200.0f;
         } else if (ones == 2) {
-          manage.slope_standard = 2000.0f;
+          manage.slope_std = 2000.0f;
         }
       } else if (huns == 1) {
         manage.sleep_time = tens * 10 + ones;
@@ -340,16 +344,27 @@ void MyServerCallbacks::onDisconnect(BLEServer *pServer) {
   }
 }
 
-void ControlCallbacks::onSubscribe(BLECharacteristic *pCharacteristic) {
+void ControlCallbacks::onSubscribe(NimBLECharacteristic *pCharacteristic,
+                    ble_gap_conn_desc *desc, uint16_t subValue) {
+  ESP_LOGE("","ControlCallbacks::onSubscribe");
   ble.sendSyncInfo();
 }
 
 void ControlCallbacks::onWrite(BLECharacteristic *pCharacteristic) {
-  String value = pCharacteristic->getValue();
-  ble.parseSyncInfo(value.toInt());
+  String str = pCharacteristic->getValue();
+  // HACK
+  ESP_LOGE("","%s",str);
+  ble.parseSyncInfo(str.toInt());
+}
+
+void DeveloperCallbacks::onSubscribe(NimBLECharacteristic *pCharacteristic,
+                    ble_gap_conn_desc *desc, uint16_t subValue){
+  ESP_LOGE("","DeveloperCallbacks::onSubscribe");
 }
 
 void DeveloperCallbacks::onWrite(BLECharacteristic *pCharacteristic) {
-  String value_s = pCharacteristic->getValue();
-  ble.parseDeveloperInfo(value_s.toInt());
+  String str = pCharacteristic->getValue();
+  // HACK
+  ESP_LOGE("","%s",str);
+  ble.parseDeveloperInfo(str.toInt());
 }

@@ -71,13 +71,18 @@ void loop() {}
 
 static void comm_task(void *pvParameter) {
   ble.Init();
+  // record
   cmd_parser.register_cmd(KEY_METER_CALI_FLAT,cmd_meter_flat_cali);
+  cmd_parser.register_cmd(KEY_METER_FLAT_RECORD,cmd_meter_flat_record);
   cmd_parser.register_cmd(KEY_METER_CALI_ANGLE,cmd_meter_angle_cali);
-  cmd_parser.register_cmd(KEY_FLAT_SHOW,cmd_meter_flat_show);
+  cmd_parser.register_cmd(KEY_METER_ANGLE_RECORD,cmd_meter_angle_record);
+  // cmd
   cmd_parser.register_cmd(KEY_UI_PAGE,cmd_ui_page);
   cmd_parser.register_cmd(KEY_SYSTEM_TYPE,cmd_system_type);
   cmd_parser.register_cmd(KEY_SYSTEM_MODE,cmd_system_mode);
+  // show
   cmd_parser.register_cmd(KEY_SYS_SHOW,cmd_meter_sys_show);
+  cmd_parser.register_cmd(KEY_FLAT_SHOW,cmd_meter_flat_show);
   
   bool last_state = false;
   unsigned long slow_sync = millis();

@@ -20,12 +20,13 @@ private:
 public:
   byte debug_mode = 0;
   String local_name = "Ensightful";
+  String local_id = "00:00";
   /* measure */
   Measure measure;
   /* angel */
   ClinoMeter  clino;
   float auto_angle = 0.0f;
-  float slope_standard = 1000.0f;
+  float slope_std = 1000.0f;
   byte speed_mode  = SPEED_MODE_QUICK;
   /* flatness */
   FlatnessMeter flat;
@@ -65,7 +66,7 @@ byte meter_type = TYPE_2_0;
 #endif // TYPE
   Preferences   pref;
   int battery = 0;
-  int  sleep_time = 15; 
+  int  sleep_time = 30; 
   /* msg */
   String  angle_msg = "";
   String  flatness_msg = "";
@@ -73,15 +74,15 @@ byte meter_type = TYPE_2_0;
 
 #ifdef HARDWARE_1_0
   int version_hardware = 100;
-  int version_software = 600;
+  int version_software = 701;
   int version_imu = 0;
 #elif defined(HARDWARE_2_0)
   int version_hardware = 205;
-  int version_software = 600;
+  int version_software = 701;
   int version_imu = 0;
 #elif defined(HARDWARE_3_0)
   int version_hardware = 306;
-  int version_software = 600;
+  int version_software = 701;
   int version_imu = 0;
 #else
   int version_hardware = 0;
@@ -99,6 +100,7 @@ byte meter_type = TYPE_2_0;
     warn_slope = pref.getFloat("WarnSlope",0);
     warn_flat = pref.getFloat("WarnFlat",0);
     sleep_time = pref.getInt("Sleep",15);
+    slope_std = pref.getFloat("SlopeStd",1000);
     pref.end();
     if (meter_type == METER_TYPE_DEFINE::TYPE_0_5) {
       local_name = "Ensightful_500_";
@@ -198,7 +200,6 @@ byte meter_type = TYPE_2_0;
   void set_flat_progress(int value){
     if(value < 0 || value > 100){return;}
     flat.measure.progress = value;
-    Serial.printf("pro:%d\n\r",flat.measure.progress);
   }
 
   void put_meter_type(){
@@ -248,6 +249,11 @@ byte meter_type = TYPE_2_0;
     pref.end();
   }
 
+  void put_slope_std(){
+    pref.begin("Meter",false);
+    pref.putFloat("SlopeStd", slope_std);
+    pref.end();
+  }
 void AckToApp(String info){
   ack_msg = info + "\r\n";
 }
@@ -334,14 +340,13 @@ float roundToZeroOrFive(float value,int bits) {
 }
 
 float ConvertToSlope(float angle) {
-  float standard = slope_standard;
   bool sign = (angle > 0);
   float slope = 0;
   if(fabs(angle) <= 45.0f){
-    slope = round(tan(fabs(angle)  * 0.01745f) * standard * 10.0f) / 10.0f;
+    slope = round(tan(fabs(angle)  * 0.01745f) * slope_std * 10.0f) / 10.0f;
   }
   else if(fabs(angle)  > 45.0f){
-    slope = round(tan((90 - fabs(angle)) * 0.01745f) * standard * 10.0f) / 10.0f;
+    slope = round(tan((90 - fabs(angle)) * 0.01745f) * slope_std * 10.0f) / 10.0f;
   }
   return sign ? slope : -slope;
 }

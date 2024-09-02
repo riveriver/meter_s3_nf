@@ -855,12 +855,26 @@ void MeterUI::pageFlatFactoryZero() {
 }
 
 void MeterUI::pageInfo(int selection) {
-  screen_h.setFont(u8g2_font_6x12_mr);
+  screen_h.setFont(u8g2_font_6x13_mr);
   byte size = 10; 
   byte sensor_num = 0; 
   String str_head = "";
   switch (selection) {
     case 0:
+      screen_h.drawStr(2, 8, "InfoPAGE:");
+      screen_h.drawStr(70,8, String(selection).c_str());
+      screen_h.drawStr(2, 18, "SOFTWARE:");
+      screen_h.drawStr(70,18, String(manage.version_software).c_str());
+      screen_h.drawStr(2, 28, "HARDWARE:");
+      screen_h.drawStr(70,28, String(manage.version_hardware).c_str());
+      screen_h.drawStr(2, 38, "IMU:");
+      screen_h.drawStr(70,38, String(manage.version_imu).c_str());
+      screen_h.drawStr(2, 48, "Battery:");
+      screen_h.drawStr(70,48, String(*pBattry).c_str());
+      screen_h.drawStr(2, 58, "Battery:");
+      screen_h.drawStr(70,58, String(*pBattry).c_str());
+      break;
+    case 1:
       screen_h.drawStr(0, 8, "Dist_Linear_FPeak");
       for (int i = 0; i < 8; i++) {
         int x_offset = (i < 4) ? 0 : 64;
@@ -869,7 +883,7 @@ void MeterUI::pageInfo(int selection) {
         screen_h.drawStr(x_offset + 40, y_offset,String(pDS->filt_peak[i],0).c_str());
       }
       break;
-    case 1:
+    case 2:
       screen_h.drawStr(0, 8, "Filt_FPeak");
       for (int i = 0; i < 8; i++) {
         int x_offset = (i < 4) ? 0 : 64;
@@ -878,7 +892,7 @@ void MeterUI::pageInfo(int selection) {
         screen_h.drawStr(x_offset + 32, y_offset,String(pDS->filt_peak[i], 0).c_str());
       }
       break;
-    case 2:
+    case 3:
       screen_h.drawStr(0, 8, "Raw_RPeak");
       for (int i = 0; i < 8; i++) {
         int x_offset = (i < 4) ? 0 : 64;
@@ -888,10 +902,10 @@ void MeterUI::pageInfo(int selection) {
                          String(pDS->raw_peak[i], 0).c_str());
       }
       break;
-    case 3:
+    case 4:
         pageImuInfo();
       break;
-    case 4:
+    case 5:
       str_head = "SensorNum0:" + String(pDS->filt[0],0);
       screen_h.drawStr(0, 8, str_head.c_str());
       for (int i = 0; i < 11; i++) {
@@ -900,7 +914,7 @@ void MeterUI::pageInfo(int selection) {
         screen_h.drawStr(x_offset, y_offset, String(pDS->map_x[0][i],0).c_str());
       }
       break;
-    case 5:
+    case 6:
       str_head = "SensorNum1:" + String(pDS->filt[1],0);
       screen_h.drawStr(0, 8, str_head.c_str());
       for (int i = 0; i < 11; i++) {
