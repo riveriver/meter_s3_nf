@@ -45,14 +45,6 @@ public:
         V[1] = V[0];
         V[0] = analogRead(p);
         V_BW = V_BW * 0.96 + V[0] * 0.02 + V[1] * 0.02;
-#ifdef BAT_TEST
-        static int record_time = millis();
-        int time = millis()/60000;
-        if(millis() - record_time > 60000*3){
-        record_time = millis();
-        manage.AckToApp("BAT:" + String(V_BW) + "Time:" + String(time));
-        }
-#endif
 
 #ifdef HARDWARE_2_0
     // 4.2 -> 2370, 3.6-> 2120

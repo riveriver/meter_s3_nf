@@ -89,10 +89,10 @@ enum SPEED_MODE_DEFINE {
 };
 
 enum CALI_STEP{
-  SAVE  = 11,
-  RECORD  = 12,
-  RESET = 13,
-  ECHO = 14,
+  SAVE  = 30,
+  RECORD  = 31,
+  RESET = 32,
+  ECHO = 34,
 };
 
 struct Measure{

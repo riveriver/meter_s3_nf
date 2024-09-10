@@ -152,10 +152,8 @@ void BLE::sendSyncInfo() {
   int hard_ver = manage.version_hardware + VERSION_HARDWARE_BASE * 1000;
   ControlChar->setValue(soft_ver);
   ControlChar->notify(true);
-  ESP_LOGE("","soft_verL:%d",soft_ver);
   ControlChar->setValue(hard_ver);
   ControlChar->notify(true);
-  ESP_LOGE("","hard_ver:%d",hard_ver);
   ControlChar->setValue(manage.battery);
   ControlChar->notify(true);
   ControlChar->setValue(manage.meter_type + METER_TYPE_BASE * 1000);
@@ -164,48 +162,38 @@ void BLE::sendSyncInfo() {
   ControlChar->notify(true);
 }
 
-bool BLE::QuickNotifyEvent() {
-  // HACK
-  bool if_active = false;
+void BLE::QuickNotifyEvent() {
+
   // send measure status to app
   SendStatus(&manage.measure.state);
   if (manage.has_home_change == true) {
     ControlChar->setValue((manage.home_mode) + HOME_MODE_BASE * 1000);
     ControlChar->notify(true);
     manage.has_home_change = false;
-    if_active = true;
   }
 
   if (manage.ack_msg != "") {
     DeveloperChar->setValue(manage.ack_msg);
     DeveloperChar->notify(true);
     manage.ack_msg = "";
-    if_active = true;
   }
 
   if (manage.angle_msg != "") {
     DeveloperChar->setValue(manage.angle_msg);
     DeveloperChar->notify(true);
     manage.angle_msg = "";
-    if_active = true;
   }
 
   if (manage.flatness_msg != "") {
     DeveloperChar->setValue(manage.flatness_msg);
     DeveloperChar->notify(true);
     manage.flatness_msg = "";
-    if_active = true;
   }
-
-  return if_active;
 }
 
 void BLE::SlowNotifyEvent() {
-  if (millis() - slow_sync > 60000) {
     ControlChar->setValue(manage.battery);
     ControlChar->notify(true);
-    slow_sync = millis();
-  }
 }
 
 void BLE::parseDeveloperInfo(int info) {
@@ -254,25 +242,24 @@ void BLE::ParseFlatCaliCmd(int info) {
     if (data == CALI_STEP::RESET) {
       manage.page = PAGE_INFO;
       manage.flat_height_level = -1;
-      manage.AckToApp("cmd[0]:reset success");
+      manage.AckToApp("[ACK] cmd:0_reset_success");
       return;
     }
     if (manage.flat_height_level == -1) {
       manage.flat_height_level = data;
       manage.flat.state = FLAT_APP_CALI;
     } else {
-      manage.AckToApp("cmd[0]:please reset or wait!");
+      manage.AckToApp("[ACK] cmd:0_please_reset_or_wait!");
     }
   }else{
-    manage.AckToApp("[error]cmd:" + String(huns));
+    manage.AckToApp("[ACK] error!cmd:" + String(huns));
   }
 }
 
 void BLE::ParseDebugMode(byte part, byte data) {
   switch (part) {
     case 2:
-      manage.flat_debug = data;
-      ESP_LOGE("", "part:%d;data:%d", part, data);
+      manage.debug_flat_mode = data;
       break;
     default:
       ESP_LOGE("", "part:%d", part);
@@ -346,14 +333,11 @@ void MyServerCallbacks::onDisconnect(BLEServer *pServer) {
 
 void ControlCallbacks::onSubscribe(NimBLECharacteristic *pCharacteristic,
                     ble_gap_conn_desc *desc, uint16_t subValue) {
-  ESP_LOGE("","ControlCallbacks::onSubscribe");
   ble.sendSyncInfo();
 }
 
 void ControlCallbacks::onWrite(BLECharacteristic *pCharacteristic) {
   String str = pCharacteristic->getValue();
-  // HACK
-  ESP_LOGE("","%s",str);
   ble.parseSyncInfo(str.toInt());
 }
 
@@ -364,7 +348,5 @@ void DeveloperCallbacks::onSubscribe(NimBLECharacteristic *pCharacteristic,
 
 void DeveloperCallbacks::onWrite(BLECharacteristic *pCharacteristic) {
   String str = pCharacteristic->getValue();
-  // HACK
-  ESP_LOGE("","%s",str);
   ble.parseDeveloperInfo(str.toInt());
 }

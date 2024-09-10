@@ -70,11 +70,9 @@ void Button::Update() {
       }
       else if(Press_Power) {
   #ifdef HARDWARE_2_0
-    manage.page = PAGE_ZERO_MENU;
+        manage.page = PAGE_ZERO_MENU;
   #endif
-  #ifdef DEVELOPER_MODE
-    manage.page = PAGE_INFO;
-  #endif
+        if(manage.debug_sys_mode == 1)manage.page = PAGE_INFO;
       }
     break;
   /* BLE */
@@ -105,8 +103,10 @@ void Button::Update() {
         }
       }
   #else
-      else if (Press_Back) {manage.page = PAGE_HOME;manage.cursor = 0;}
-      else if (Press_Enter) {
+      else if(Press_Back){
+        manage.page = PAGE_HOME;manage.cursor = 0;
+      }
+      else if(Press_Enter){
         if(PAGE_ZERO_MENU + manage.cursor + 1 == PAGE_ZERO_ANGLE){
           pIMU->cali_state = IMU_COMMON;
           manage.page = PAGE_ZERO_MENU + manage.cursor + 1;
@@ -148,7 +148,29 @@ void Button::Update() {
         break;
       }
     break;
-  /* PAGE_ZERO_ANGLE */
+  /* PAGE_ZERO_FLAT */
+    case PAGE_ZERO_FLAT:
+      switch (manage.flat.state) {
+      case FLAT_FSM_DEFINE::FLAT_COMMON :
+          if (Press_Up) pDS->yes_no = false;
+          else if(Press_Down) pDS->yes_no = true;
+          else if(Press_Back ){manage.page = PAGE_ZERO_MENU;}
+          else if(Press_Enter && !pDS->yes_no){manage.page = PAGE_ZERO_MENU;}
+          else if(Press_Enter && pDS->yes_no)manage.flat.state = FLAT_FSM_DEFINE::FLAT_CALI_ZERO;
+      break;
+      case FLAT_FSM_DEFINE::FLAT_CALI_ZERO:
+        if(Press_Back ){
+          manage.flat.state = FLAT_FSM_DEFINE::FLAT_COMMON;
+          manage.page = PAGE_ZERO_MENU;
+        }
+      break;
+      default:
+          manage.flat.state = FLAT_FSM_DEFINE::FLAT_COMMON;
+          manage.page = PAGE_ZERO_MENU;
+        break;
+      }
+    break;
+  /* PAGE_IMU_FACTORY_ZERO */
     case PAGE_IMU_FACTORY_ZERO:
       switch (pIMU->cali_state) {
         case IMU_COMMON:
@@ -215,16 +237,19 @@ void Button::Update() {
   }
     break;
     case PAGE_INFO:
-      if (Press_Up)
+      if(Press_Back){
+        manage.page = PAGE_HOME;
+        manage.cursor = 0;
+      }
+      if(Press_Power){
+        manage.page = PAGE_HOME;
+        manage.cursor = 0;
+      }
+      if (Press_Up){
         manage.cursor = (manage.cursor - 1 + 7) % 7;
-      else if(Press_Down)
+      }
+      if(Press_Down){
         manage.cursor = (manage.cursor + 1) % 7;
-      else if(Press_Back){
-        manage.page = PAGE_HOME;
-        manage.cursor = 0;
-      }else if(Press_Power){
-        manage.page = PAGE_HOME;
-        manage.cursor = 0;
       }
       break;
     case PAGE_CALI_FLAT:

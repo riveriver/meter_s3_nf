@@ -62,25 +62,20 @@ void IMU42688::unpackFromC3(unsigned char info){
             has_imu_data = true;
             unpack_step = STEP_FRAME_HEAD;
         }else{
-          data_rx_buffer[data_rx_index] = info;
-          data_rx_index++;
-          if (data_rx_index >= 64) {data_rx_index = 63;}
+          data_rx_buffer[data_rx_index % BUFFER_SIZE] = info;
+          data_rx_index = (data_rx_index + 1) % BUFFER_SIZE;
         }
         break;
       case STEP_PRASE_CALI:
           if(info == '>'){
-              cali_rx_buffer[cali_rx_index] = '\0';
-              manage.angle_msg = "";
-              for(int i = 0;i < cali_rx_index;i++){
-                manage.angle_msg += cali_rx_buffer[i];
-              }
-              Serial.println(manage.angle_msg);
+              String msg = String(cali_rx_buffer, cali_rx_index);
+              Serial.println(msg);
+              manage.angle_msg = msg;
               cali_rx_index = 0;
               unpack_step = STEP_FRAME_HEAD;
           }else{
-            cali_rx_buffer[cali_rx_index] = info;
-            cali_rx_index++;
-            if (cali_rx_index >= 64) {cali_rx_index = 64 - 1;}
+          cali_rx_buffer[cali_rx_index % BUFFER_SIZE] = info;
+          cali_rx_index = (cali_rx_index + 1) % BUFFER_SIZE;
         }
         break;
       default:
@@ -243,72 +238,6 @@ uint8_t IMU42688::Update() {
 }  // end Update()
 
 
-/**
- * @brief Collect the angle data if IMU stay stable.
- * @note Will cancel the calibration if the IMU's attitude change severe such
- * that the gravity direction change.
- */
-void IMU42688::CollectCalData()
-{
-    // Check if the angle data already been load.
-    if (!has_new_data)
-        return;
-    else
-        has_new_data = false;
-
-    // Initialize the collection
-    if (avg_count == 0)
-    {
-        _start_g = _gravity;
-        memmove(&_start_angle[0], &angle_raw[0], sizeof(_start_angle));
-    }
-
-    // If the IMU's attitude change severe such that the gravity direction change, cancel the calibration.
-    else if (_gravity != _start_g)
-    {
-        StopCali();
-        return;
-    }
-
-    // Check the stability.
-    for (int i = 0; i < 2; i++)
-    {
-        // If the IMU's reading outside the threshold, restart the collection.
-        if(fabs(angle_raw[i] - _start_angle[i] > set_zero_th))
-        {
-            avg_count = 1;
-            memmove(&_start_angle[0], &angle_raw[0], sizeof(_start_angle));
-            memmove(&_sum_angle[0], &angle_raw[0], sizeof(_sum_angle));
-            return;
-        }
-        // else, add the value to the buffer.
-        _sum_angle[i] += angle_raw[i];
-    }
-    avg_count++;
-}
-
-void IMU42688::CaliFactoryZero() {
-  // Collect angle data.
-  CollectCalData();
-
- if (avg_count < avg_total){
-    cali_progress = (avg_count <= 1) ? 0 : (avg_count - 1) * 100.0 / avg_total;
-  }
-  else {
-    pref.begin("Angle_Cal", false);
-    b[1] = 0 - _sum_angle[1] / avg_total;
-    pref.putFloat("By", b[1]);
-    e[1] = b[1];
-    pref.putFloat("Ey", e[1]);
-    pref.end();
-    avg_count = 0;
-    memset(&_sum_angle, 0, sizeof(_sum_angle));
-    cali_state = IMU_COMPLETE;
-    manage.angle_msg = "imu_factory_zero:";
-    manage.angle_msg += String(e[1], 2) + ",";
-  }
-}
-
 void IMU42688::ResetFactoryZero() {
   e[1] = b[1];
   if(pref.begin("Angle_Cal", false)){
@@ -319,36 +248,95 @@ void IMU42688::ResetFactoryZero() {
 
 void IMU42688::QuickCalibrate() {
   // Collect angle data.
-  CollectCalData();
+    // Check if the angle data already been load.
+    if (!has_new_data)return;
+    else has_new_data = false;
+    byte avg_total = 20;
 
- if (avg_count < avg_total){
-    cali_progress = (avg_count <= 1) ? 0 : (avg_count - 1) * 100.0 / avg_total;
-  }
-  else {
+    // Initialize the collection
+    if (avg_count == 0)
+    {
+        _start_g = _gravity;
+        _start_angle = angle_raw[1];
+        _sum_angle = 0;
+    }
+
+    // If the IMU's reading outside the threshold, restart the collection.
+    if(fabs(angle_raw[1] - _start_angle > 0.1))
+    {
+        avg_count = 0;
+        return;
+    }
+        // else, add the value to the buffer.
+    _sum_angle += angle_raw[1];
+    avg_count++;
+
+ if (avg_count == avg_total){
     pref.begin("Angle_Cal", false);
-    e[1] = 0 - _sum_angle[1] / avg_total;
+    e[1] = 0 - _sum_angle / avg_total;
     pref.putFloat("Ey", e[1]);
     pref.end();
-    cali_progress = 100;
     avg_count = 0;
-    memset(&_sum_angle, 0, sizeof(_sum_angle));
+    _sum_angle = 0;
     cali_state = IMU_COMPLETE;
-    
-    String S = "[Angle]SetZeroComplete: ";
-    S += String(e[1], 2) + ",";
-    // Serial.println(S);
+    String msg = "meter.angle.params.custom_zero:" + String(e[1], 2);
+    Serial.println(msg);
+    manage.angle_msg = msg;
+    return;
   }
+    cali_progress = avg_count * 100.0 / avg_total;
 }
 
-/**
- * @brief Set all parameters related to the calibration procedure to default.
- */
+void IMU42688::CaliFactoryZero() {
+  // Collect angle data.
+    // Check if the angle data already been load.
+    if (!has_new_data)return;
+    else has_new_data = false;
+
+    byte avg_total = 100;
+
+    // Initialize the collection
+    if (avg_count == 0)
+    {
+        _start_g = _gravity;
+        _start_angle = angle_raw[1];
+        _sum_angle = 0;
+    }
+
+    // If the IMU's reading outside the threshold, restart the collection.
+    if(fabs(angle_raw[1] - _start_angle > 0.05))
+    {
+        avg_count = 0;
+        return;
+    }
+        // else, add the value to the buffer.
+    _sum_angle += angle_raw[1];
+    avg_count++;
+
+ if (avg_count == avg_total){
+    pref.begin("Angle_Cal", false);
+    b[1] = 0 - _sum_angle / avg_total;
+    pref.putFloat("By", b[1]);
+    e[1] = b[1];
+    pref.putFloat("Ey", e[1]);
+    pref.end();
+    avg_count = 0;
+    _sum_angle = 0;
+    cali_state = IMU_COMPLETE;
+    String msg = "meter.angle.params.factory_zero " + String(e[1], 2);
+    Serial.println(msg);
+    manage.angle_msg = msg;
+    return;
+  }
+    cali_progress = avg_count * 100.0 / avg_total;
+}
+
 void IMU42688::StopCali() {
   cali_state = IMU_COMMON;
-  yes_no = false;
+  yes_no = true;
   cali_progress = 0;
   avg_count = 0;
-  memset(&_sum_angle, 0, sizeof(_sum_angle));
+  _sum_angle = 0.0f;
 }
 
 void IMU42688::onMeasureReset() {
@@ -361,12 +349,12 @@ void IMU42688::setParam(uint8_t mode) {
   // HACK measure_total 过小会不会导致未稳定下来就测量
   switch (mode) {
     case SPEED_MODE_STANDARD:
-      measure_total = 10;
+      measure_total = 20;
       un_hold_th = 2.0f;
       un_stable_th = 0.1f;
       break;
     case SPEED_MODE_QUICK:
-      measure_total = 5;
+      measure_total = 10;
       un_hold_th = 2.0f;
       un_stable_th = 0.2f;
       break;

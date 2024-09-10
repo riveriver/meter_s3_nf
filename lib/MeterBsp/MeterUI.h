@@ -28,11 +28,11 @@ private:
     bool is_begin = false;
     byte rotation = 0;
     byte g_this = 0;
-    byte g_last = 0;
+    byte g_last = 1;
+    byte flat_ui_th = 90;
     uint8_t bar_timer = 0;
     String  block_info = "";
     void Flip();
-    void FlipFirst();
     void DoBlock();
     void drawNum_10x16(int x,int y,String str,int size);
     void drawNum_16x24(int x,int y,String str,int size);

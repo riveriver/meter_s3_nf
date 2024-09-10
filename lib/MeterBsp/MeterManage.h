@@ -18,7 +18,8 @@
 class Meter{
 private:
 public:
-  byte debug_mode = 0;
+  byte debug_sys_mode = 0;
+  byte debug_flat_mode = 0;
   String local_name = "Ensightful";
   String local_id = "00:00";
   /* measure */
@@ -31,10 +32,9 @@ public:
   /* flatness */
   FlatnessMeter flat;
   byte  max_sensor_num = 0;
-  float max_filt_peak = 0;
   bool flat_abs = true;
   int8_t  flat_height_level = -1;
-  byte flat_debug = 0;
+
   /* warning */
   byte warn_light_onoff  = true;
   float warn_slope = 0;
@@ -66,7 +66,7 @@ byte meter_type = TYPE_2_0;
 #endif // TYPE
   Preferences   pref;
   int battery = 0;
-  int  sleep_time = 30; 
+  int  sleep_time = 15; 
   /* msg */
   String  angle_msg = "";
   String  flatness_msg = "";
@@ -81,8 +81,8 @@ byte meter_type = TYPE_2_0;
   int version_software = 701;
   int version_imu = 0;
 #elif defined(HARDWARE_3_0)
-  int version_hardware = 306;
-  int version_software = 701;
+  int version_hardware = 305;
+  int version_software = 707;
   int version_imu = 0;
 #else
   int version_hardware = 0;
@@ -255,6 +255,7 @@ byte meter_type = TYPE_2_0;
     pref.end();
   }
 void AckToApp(String info){
+  Serial.println(info);
   ack_msg = info + "\r\n";
 }
 

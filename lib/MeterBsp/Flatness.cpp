@@ -94,6 +94,37 @@ void Flatness::init() {
   }
 }
 
+int Flatness::ProcessMeasureFSM() {
+  uint8_t state = manage.flat.measure.state;
+  if(state == M_IDLE){return state;}
+  float measure_source = manage.flat.flat_live;
+  if (state == M_MEASURE_DONE || state == M_UPLOAD_DONE) {
+    if(fabs(measure_source - hold_ref) > 2.0f){
+      hold_ref = 0;
+      manage.set_flat_progress(0);
+      return state = M_IDLE;
+    }
+    return state;
+  }
+  if (refer_peak > 30) {
+    measure_count = 0;
+    return state = M_UNSTABLE;
+  }else {
+    measure_count++;
+  }
+  if(measure_count == 10){
+    measure_count = 0;
+    manage.flat.flat_hold = measure_source;
+    manage.max_sensor_num = max_dist_num;
+    hold_ref = measure_source;
+    manage.set_flat_progress(100);
+    return state = M_MEASURE_DONE;
+  }
+  int pro = measure_count * 100.0 / 10.0;
+  manage.set_flat_progress(pro);
+  return state = M_MEASURE_ING;
+}
+
 void Flatness::UpdateAllInOne() {
 /*----- data sample ----*/
 #ifdef SENSOR_1_1
@@ -117,7 +148,7 @@ void Flatness::UpdateAllInOne() {
         byte id = i * channel_num + j;
         raw[id] = 0;
         filt[id] = 0;
-        dist[id] = 0;
+        dist[id] = -1;
       }
       continue;
     }
@@ -175,7 +206,7 @@ void Flatness::UpdateAllInOne() {
         byte id = i * 4 + j;
         raw[id]  = 0;
         filt[id] = 0;
-        dist[id] = 0;
+        dist[id] = -1;
         raw_peak[id] = 0;
         filt_peak[id] = 0;
         sensor_valid[id] = false;
@@ -222,86 +253,49 @@ void Flatness::UpdateAllInOne() {
       raw[id] = ads1115[i].readADC_SingleEnded(j);
       // raw over th,return
       if(raw[id] < 5000){
-        filt_vec[id].clear();
-        filt[id] = 99;
-        filt_peak[id] = 99;
-        dist[id] = 99;
+        filt[id] = 0;
+        filt_peak[id] = 0;
+        dist[id] = -2;
         sensor_valid[id] = false;
         continue;
       }
+
+      // get flag
+      sensor_valid[id] = true;
+
+      // get raw vec
       if (raw_vec[id].size() == raw_vec[id].capacity()) {
         raw_vec[id].erase(raw_vec[id].begin());
       }
       raw_vec[id].push_back(raw[id]);
       std::vector<int> raw_temp = raw_vec[id];
-#ifdef DEVELOPER_MODE
-      float  raw_max = *std::max_element(raw_vec[id].begin(), raw_vec[id].end());
-      float  raw_min = *std::min_element(raw_vec[id].begin(), raw_vec[id].end());
-      raw_peak[id] = raw_max - raw_min;
-      // // raw_peak over th,return
-      // if(raw_peak[id] > 200){
-      //   filt_vec[id].clear();
-      //   filt[id] = 99;
-      //   filt_peak[id] = 99;
-      //   dist[id] = 99;
-      //   sensor_valid[id] = false;
-      //   continue;
-      // }
-#endif
-      // filt
+
+      // debug raw_peak
+      if(manage.debug_flat_mode == 21){
+        float  raw_max = *std::max_element(raw_vec[id].begin(), raw_vec[id].end());
+        float  raw_min = *std::min_element(raw_vec[id].begin(), raw_vec[id].end());
+        raw_peak[id] = raw_max - raw_min;
+      }
+
+      // get_filt
       filt[id] = median.calculateMedian(raw_temp);
       if (filt_vec[id].size() == filt_vec[id].capacity()) {
         filt_vec[id].erase(filt_vec[id].begin());
       }
+      
+      // get filt_peak
       filt_vec[id].push_back(filt[id]);
       float  filt_max = *std::max_element(filt_vec[id].begin(), filt_vec[id].end());
       float  filt_min = *std::min_element(filt_vec[id].begin(), filt_vec[id].end());
       filt_peak[id] = filt_max - filt_min; 
+
       // map distance
       mapDist(id,filt[id]);
-      sensor_valid[id] = true;
+      
     }
   }
 #endif
-  // ready flag
-  float max_peak = 0;
-  for(int i = 0;i < SENSOR_NUM;i++){
-    if(sensor_valid[i] && filt_peak[i] > max_peak)max_peak = filt_peak[i];
-    if(filt_peak[i] > 30)manage.flat.ready[i] = 0;else manage.flat.ready[i] = 1;
-  }
-  refer_peak = max_peak; 
-  PrintDebugInfo(manage.flat_debug);
-}
-
-int Flatness::ProcessMeasureFSM() {
-  uint8_t state = manage.flat.measure.state;
-  if(state == M_IDLE){return state;}
-  float measure_source = manage.flat.flat_live;
-  if (state == M_MEASURE_DONE || state == M_UPLOAD_DONE) {
-    if(fabs(measure_source - hold_ref) > 2.0f){
-      hold_ref = 0;
-      manage.set_flat_progress(0);
-      return state = M_IDLE;
-    }
-    return state;
-  }
-  if (refer_peak > 30) {
-    measure_count = 0;
-    return state = M_UNSTABLE;
-  }else {
-    measure_count++;
-  }
-  if(measure_count == 10){
-    measure_count = 0;
-    manage.flat.flat_hold = measure_source;
-    manage.max_sensor_num = max_dist_num;
-    hold_ref = measure_source;
-    manage.set_flat_progress(100);
-    return state = M_MEASURE_DONE;
-  }
-  int pro = measure_count * 100.0 / 10.0;
-  manage.set_flat_progress(pro);
-  return state = M_MEASURE_ING;
+  PrintDebugInfo(manage.debug_flat_mode);
 }
 
 void Flatness::mapDist(int id, float x) {
@@ -311,7 +305,7 @@ void Flatness::mapDist(int id, float x) {
     int start = 0;
     int end = MAP_NUM;
     // 小于1mm默认为0mm
-    if(x > map_x[id][1]){
+    if(x > map_x[id][0]){
       dist[id] = dist_map[id] = dist_linear[id] = 0;
       return;
     }
@@ -337,14 +331,16 @@ void Flatness::mapDist(int id, float x) {
     return;
 }
 
-void Flatness::calculateFlatness() {
+void Flatness::getFlatness() {
 
   byte valid_size = 0;
   float flat = dist_th;
   float max = -dist_th;
   float min = dist_th;
+
   for (size_t i = 0; i < SENSOR_NUM; ++i) {
-    if(dist[i] != 0 && dist[i] < dist_th){
+
+    if(sensor_valid[i] && 0 <= dist[i] && dist[i] <= 20){
       valid_size ++;
       if (dist[i] > max) {
           max = dist[i];
@@ -357,11 +353,10 @@ void Flatness::calculateFlatness() {
   }
   if(manage.flat_abs){
     flat = valid_size < 1 ? 99.0f : max;
-    manage.set_flat_live(modifyDecimal(flat), 0);
   }else{
     flat = valid_size < 2 ? 99.0f : max - min;
-    manage.set_flat_live(modifyDecimal(flat), 0);
   }
+  manage.set_flat_live(modifyDecimal(flat), 0);
 }
 
 void Flatness::setZeros() {
@@ -380,8 +375,8 @@ void Flatness::doRobotArmCali() {
   if(step == CALI_STEP::SAVE){
     putFitParams();
     String str = "";
-      for(int i = 0; i < 8; ++i) {
-          str = String(i) + "flat.cali.param ";
+      for(int i = 0; i < SENSOR_NUM; ++i) {
+          str = "flat.cali.param ";
           str += String(i) + ",";
           for(int j = 0; j < MAP_NUM; ++j) {
               str += String(map_x[i][j],0);
@@ -396,7 +391,7 @@ void Flatness::doRobotArmCali() {
 
   if(step == CALI_STEP::ECHO){
     String str = "";
-      for(int i = 0; i < 8; ++i) {
+      for(int i = 0; i < SENSOR_NUM; ++i) {
           str = String(i) + "flat.cali.data ";
           str += String(i) + ",";
           for(int j = 0; j < MAP_NUM; ++j) {
@@ -439,31 +434,33 @@ void Flatness::doRobotArmCali() {
         max = filt_peak[i];
       }
   }
-  manage.max_filt_peak = max;
-  if (max > 8) {
+  if (max > 20) {
       stable_count = 0;
       return;
   }
   // progress
   stable_count++;
-  if(stable_count == 20){
-  for(int i = 0; i < SENSOR_NUM; i++){fit_x[i] += filt[i];}
-    manage.flat.progress += 50;
-    stable_count = 0;
+  if(stable_count > 10){
+    for(int i = 0; i < SENSOR_NUM; i++){fit_x[i] += filt[i];}
+    manage.flat.progress += 5;
   }
   
   // check finish
   if(manage.flat.progress == 100){
-
-  for (int i = 0; i < SENSOR_NUM; i++) {
-    map_x[i][step] = fit_x[i] / 2;
-  }
-  String str = "flat.cali.cpct 100";
-  Serial.println(str);
-  manage.flat.progress = 0;
-  manage.flat.cali.step = -1;
-  manage.flat.state = FLAT_COMMON;
-
+    for (int i = 0; i < SENSOR_NUM; i++) {
+      map_x[i][step] = fit_x[i] / 20;
+    }
+    if(manage.flat.cali.step == 1){
+      for (int i = 0; i < SENSOR_NUM; i++) {
+        map_x[i][0] = map_x[i][1] + 300;
+      }
+    }
+    stable_count = 0;
+    String str = "flat.cali.cpct 100";
+    Serial.println(str);
+    manage.flat.progress = 0;
+    manage.flat.cali.step = -1;
+    manage.flat.state = FLAT_COMMON;
   }
 }
 
@@ -541,14 +538,14 @@ bool  Flatness::HandleError_Wire(byte error, byte addr) {
   }
 }
 
-void Flatness::PrintDebugInfo(byte debug) {
+void Flatness::PrintDebugInfo(byte debug_mode) {
   // TODO Not elegant, needs to be optimized
   // Serial_Print_Raw_Data  = debug & 0b00000001;
   // Serial_Print_Filt_Data = debug & 0b00000010;
   // Serial_Print_Dist_Data = debug & 0b00000100;
-  if (debug == 0) return;
+  if (!manage.debug_flat_mode) return;
   String str = "";
-  switch (debug) {
+  switch (manage.debug_flat_mode) {
     case 1:
       // TODO Not elegant: use template<typename T>
       str = "raw:";
@@ -573,7 +570,7 @@ void Flatness::PrintDebugInfo(byte debug) {
       }
       break;
     default:
-      ESP_LOGE("", "set_debug:%d", debug);
+      ESP_LOGE("", "set_debug:%d", manage.debug_flat_mode);
       break;
   }
   if (str != NULL) Serial.println(str);

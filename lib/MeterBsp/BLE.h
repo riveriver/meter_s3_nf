@@ -47,7 +47,7 @@ class BLE {
   void sendSyncInfo();
   void parseSyncInfo(int info);
   void parseDeveloperInfo(int info);
-  bool QuickNotifyEvent();
+  void QuickNotifyEvent();
   void ParseAngleCaliCmd(int info);
   void ParseFlatnessCali(int info);
   void ParseDebugMode(byte part,byte data);

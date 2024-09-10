@@ -117,9 +117,8 @@ static void comm_task(void *pvParameter) {
       on_off.last_active = millis();
     }
     
-    if(ble.QuickNotifyEvent()){
-      on_off.last_active = millis();
-    }
+    ble.QuickNotifyEvent();
+
     if(millis() - slow_sync > 60000){
       slow_sync = millis();
       Bat.Update_BW();
@@ -134,12 +133,13 @@ static void comm_task(void *pvParameter) {
       if(cmd_parser.parse(rx_str.c_str()) != 0){
         Serial.println("[E]" + rx_str);
       }
+      on_off.last_active = millis();
     }
     
     xLastWakeTime = xTaskGetTickCount();
     xWasDelayed = xTaskDelayUntil(&xLastWakeTime, 300);
     if (!xWasDelayed && millis() > 10000){
-      ESP_LOGE("TASK_SEND","Time Out!!!");
+      ESP_LOGE("comm_task","Time Out!!!");
     }
   }
 }
@@ -183,7 +183,7 @@ static void angle_measure_task(void *pvParameter) {
     xLastWakeTime = xTaskGetTickCount();
     xWasDelayed = xTaskDelayUntil(&xLastWakeTime, 200);
     if (!xWasDelayed && millis() > 10000){
-      ESP_LOGE("TASK_UART","Time Out!!!");
+      ESP_LOGE("angle_measure_task","Time Out!!!");
     }
   }
 }
@@ -195,32 +195,32 @@ static void flat_measure_task(void *pvParameter) {
     flat.UpdateAllInOne();
     switch (manage.flat.state)
     {
-    case FLAT_CALI_ZERO:
-      // flat.CaliZero();
-      break;
-    case FLAT_CALI_COMPLETE:
-      manage.flat.state = FLAT_COMMON;
-      ui.Block("Calibrate Complete", 2000);
-      manage.page = PAGE_HOME;
-      manage.cursor = 0;
-      break;
-    case FLAT_FACTORY_ZERO:
-      // flat.CaliFactoryZero();
-      break;
-    case FLAT_APP_CALI:
-      // flat.doAppCali();
-      break;
-    case FLAT_ROBOT_ARM_CALI:
-      flat.doRobotArmCali();
-      break;
-    default:
-      flat.calculateFlatness();
-      break;
+      case FLAT_CALI_ZERO:
+        // flat.CaliZero();
+        break;
+      case FLAT_CALI_COMPLETE:
+        manage.flat.state = FLAT_COMMON;
+        ui.Block("Calibrate Complete", 2000);
+        manage.page = PAGE_HOME;
+        manage.cursor = 0;
+        break;
+      case FLAT_FACTORY_ZERO:
+        // flat.CaliFactoryZero();
+        break;
+      case FLAT_APP_CALI:
+        // flat.doAppCali();
+        break;
+      case FLAT_ROBOT_ARM_CALI:
+        flat.doRobotArmCali();
+        break;
+      default:
+        flat.getFlatness();
+        break;
     }
     xLastWakeTime = xTaskGetTickCount();
     xWasDelayed = xTaskDelayUntil(&xLastWakeTime, 100);
     if (!xWasDelayed && millis() > 10000){
-      ESP_LOGE("","Task flat_measure_task Time Out.");
+      ESP_LOGE("flat_measure_task","Time Out!!!");
     }  
   } 
 }
@@ -232,7 +232,7 @@ static void firmware_task(void *pvParameter) {
     xLastWakeTime = xTaskGetTickCount();
     xWasDelayed = xTaskDelayUntil(&xLastWakeTime, 300);
     if (!xWasDelayed && millis() > 10000){
-      ESP_LOGE("TASK_LOOP","Time Out!!!");
+      ESP_LOGE("firmware_task","Time Out!!!");
     }
     But.Update();
     digitalWrite(IO_Button_LED, But.CanMeasure());
@@ -248,7 +248,7 @@ static void ui_task(void *pvParameter) {
     xLastWakeTime = xTaskGetTickCount();
     xWasDelayed = xTaskDelayUntil(&xLastWakeTime, 250);
     if (!xWasDelayed && millis() > 10000){
-      ESP_LOGE("TASK_UI","Time Out!!!");
+      ESP_LOGE("ui_task","Time Out!!!");
     }
     ui.Update();
   }

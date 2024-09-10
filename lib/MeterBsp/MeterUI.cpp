@@ -21,6 +21,7 @@
 #define LINE_LHY 32
 #define LINE_LVX 6
 #define LINE_LVY 64
+byte axis[6] = {8,19,30,41,52,63};
 
 #ifdef HARDWARE_1_0
 #define SCREEN_RST 41
@@ -117,14 +118,14 @@ void MeterUI::TurnOn() {
     ESP_LOGE("screen_h", "screen_h failed");
     return;
   }
-  screen_h.setContrast(0x87);
-  // screen_h.setContrast(0x70);
+  // screen_h.setContrast(0x87);
+  screen_h.setContrast(0x70);
 
   if (!screen_s.begin()) {
     ESP_LOGE("screen_s", "screen_s failed");
     return;
   }
-  screen_s.setContrast(0x87);
+  screen_s.setContrast(0x70);
 
   // open logo
   screen_h.drawXBM(0, 0, 128, 64, Open_Logo);
@@ -211,6 +212,7 @@ void MeterUI::Update() {
   screen_s.clearBuffer();
 
   if(g_this == 0 || g_this == 3)screen_h.setDisplayRotation(U8G2_R0);
+  else if(g_this == 1) screen_h.setDisplayRotation(U8G2_R0);
   else screen_h.setDisplayRotation(U8G2_R2);
   if (!hasSwitchHome()){
     switch (manage.page) {
@@ -373,21 +375,8 @@ void MeterUI::Primary_DrawFlat() {
     screen_h.drawXBM(6, 24, 10, 16, bitmap_num_10x16[dash_num]);
     screen_h.setDrawColor(1);
   }
-
-#ifdef DEVELOPER_MODE
-  screen_h.setFont(u8g2_font_6x12_mr);
-  for(int i = 0; i < 8; i++){
-    if(pDS->sensor_valid[i]){
-      if(manage.flat.ready[i]){
-        screen_h.setDrawColor(0);
-      }
-      screen_h.drawStr(37 + 7 * i, 10,String(i + 1).c_str());
-    }
-  }
-  screen_h.setDrawColor(1);
-#endif
   
-  if (flat_show > 50.0f) {
+  if (flat_show > flat_ui_th) {
     screen_h.drawXBM(LINE_LHX, LINE_LHY, 45, 3, Main_Dash_45x3);
   } else {
     dtostrf(flat_show, 6, 1, str_show);
@@ -396,6 +385,17 @@ void MeterUI::Primary_DrawFlat() {
 }
 
 void MeterUI::Primary_DrawFlatSlope() {
+#ifdef SHOW_BOTH_DATA
+  screen_h.drawXBM(18, 15, 14, 14, bitmap_flat_icon);
+  screen_h.drawXBM(97, 16, 17, 15, BITMAP_UNIT_MM);
+  dtostrf(slope_show, 6, 1, str_show);
+  drawNum_10x16(37, 35, str_show,6);
+  
+  screen_h.drawXBM(18, 36, 14, 14, bitmap_slope_icon);
+  screen_h.drawXBM(97, 38, 17, 15, BITMAP_UNIT_MMM);
+  dtostrf(flat_show, 6, 1, str_show);
+  drawNum_10x16(37, 15, str_show,6);
+#else
   if (manage.auto_mode_select == HOME_AUTO_FLATNESS) {
     screen_h.drawXBM(5, 25, 14, 14, bitmap_flat_icon);
     screen_h.drawXBM(110, 30, 17, 15, BITMAP_UNIT_MM);
@@ -407,7 +407,7 @@ void MeterUI::Primary_DrawFlatSlope() {
       screen_h.drawXBM(6, 24, 10, 16, bitmap_num_10x16[dash_num]);
       screen_h.setDrawColor(1);
     }
-    if (flat_show > 50.0f) {
+    if (flat_show > flat_ui_th) {
       screen_h.drawXBM(LINE_LHX, NUM_LHY + 12, 45, 3, Main_Dash_45x3);
     } else {
       dtostrf(flat_show, 6, 1, str_show);
@@ -416,9 +416,10 @@ void MeterUI::Primary_DrawFlatSlope() {
   } else {
     screen_h.drawXBM(5, 25, 14, 14, bitmap_vertical_icon);
     screen_h.drawXBM(108, 31, 17, 15, BITMAP_UNIT_MMM);
-    (slope_show, 6, 1, str_show);
+    dtostrf(slope_show, 6, 1, str_show);
     drawNum_16x24(NUM_LHX, NUM_LHY, str_show, 6);
   }
+#endif
 }
 
 void MeterUI::Minor_DrawCommon() {
@@ -517,7 +518,7 @@ void MeterUI::Minor_DrawFlat() {
       screen_s.drawXBM(33, 26, 10, 16, bitmap_hash_s);
       screen_s.setDrawColor(1);
     }
-    if (flat_show > 50.0f) {
+    if (flat_show > flat_ui_th) {
       screen_s.drawXBM(LINE_LVX, LINE_LVY, 45, 3, Main_Dash_45x3);
     } else {
       dtostrf(flat_show, 6, 1, str_show);
@@ -535,20 +536,7 @@ void MeterUI::Minor_DrawFlat() {
       screen_s.setDrawColor(1);
     }
 
-#ifdef DEVELOPER_MODE
-    screen_s.setFont(u8g2_font_6x12_mr);
-    for(int i = 0; i < 8; i++){
-      if(pDS->sensor_valid[i]){
-        if(manage.flat.ready[i]){
-          screen_s.setDrawColor(0);
-        }
-        screen_s.drawStr(37 + 7 * i, 10,String(i + 1).c_str());
-      }
-    }
-    screen_s.setDrawColor(1);
-#endif
-
-    if (flat_show > 50.0f) {
+    if (flat_show > flat_ui_th) {
       screen_s.drawXBM(LINE_LHX, LINE_LHY, 45, 3, Main_Dash_45x3);
     } else {
         dtostrf(flat_show, 6, 1, str_show);
@@ -558,6 +546,42 @@ void MeterUI::Minor_DrawFlat() {
 }
 
 void MeterUI::Minor_DrawFlatSlope() {
+#ifdef SHOW_BOTH_DATA
+if (rotation == VERTICAL) {
+  screen_s.drawXBM(44, 60, 17, 15, BITMAP_UNIT_MM);
+  if (measure_state == M_MEASURE_DONE || measure_state == M_UPLOAD_DONE) {
+    screen_s.setDrawColor(2);
+    screen_s.drawBox(2, 22, 60, 24);
+    screen_s.setDrawColor(0);
+    screen_s.drawXBM(20, 4, 10, 16, bitmap_num_10x16[dash_num]);
+    screen_s.drawXBM(33, 4, 10, 16, bitmap_hash_s);
+    screen_s.setDrawColor(1);
+  }
+  if (flat_show > flat_ui_th) {
+    screen_s.drawXBM(6, 49, 45, 3, Main_Dash_45x3);
+  } else {
+    dtostrf(flat_show, 6, 1, str_show);
+    Minor_drawNum_10x16(6, 49, str_show, 6);
+  }
+
+  screen_s.drawBox(2, 71, 60, 2);
+
+  screen_s.drawXBM(44, 81, 17, 15, BITMAP_UNIT_MMM);
+  dtostrf(slope_show, 6, 1, str_show);
+  Minor_drawNum_10x16(2, 80, str_show, 6);
+}
+else{
+  screen_s.drawXBM(18, 15, 14, 14, bitmap_flat_icon);
+  screen_s.drawXBM(97, 16, 17, 15, BITMAP_UNIT_MM);
+  dtostrf(slope_show, 6, 1, str_show);
+  drawNum_10x16(37, 35, str_show,6);
+  
+  screen_s.drawXBM(18, 36, 14, 14, bitmap_slope_icon);
+  screen_s.drawXBM(97, 38, 17, 15, BITMAP_UNIT_MMM);
+  dtostrf(flat_show, 6, 1, str_show);
+  drawNum_10x16(37, 15, str_show,6);
+}
+#else
   if (rotation == VERTICAL) {
     if (manage.auto_mode_select == HOME_AUTO_FLATNESS) {
       screen_s.drawXBM(27, 2, 14, 14, bitmap_flat_icon);
@@ -570,7 +594,7 @@ void MeterUI::Minor_DrawFlatSlope() {
         screen_s.drawXBM(33, 26, 10, 16, bitmap_hash_s);
         screen_s.setDrawColor(1);
       }
-      if (flat_show > 50.0f) {
+      if (flat_show > flat_ui_th) {
         screen_s.drawXBM(LINE_LVX, LINE_LVY, 45, 3, Main_Dash_45x3);
       } else {
         dtostrf(flat_show, 6, 1, str_show);
@@ -594,7 +618,7 @@ void MeterUI::Minor_DrawFlatSlope() {
         screen_s.drawXBM(18, 24, 10, 16, bitmap_hash_s);
         screen_s.setDrawColor(1);
       }
-      if (flat_show > 50.0f) {
+      if (flat_show > flat_ui_th) {
         screen_s.drawXBM(LINE_LHX, LINE_LHY, 45, 3, Main_Dash_45x3);
       } else {
         dtostrf(flat_show, 6, 1, str_show);
@@ -607,6 +631,7 @@ void MeterUI::Minor_DrawFlatSlope() {
       Minor_drawNum_16x24(NUM_LHX, NUM_LHY, str_show, 6);
     }
   }
+#endif
 }
 
 void MeterUI::Minor_DrawArrow() {
@@ -684,6 +709,7 @@ void MeterUI::pageSwitchLight() {
 }
 
 void MeterUI::pageSwitchBLE() {
+  screen_h.setDisplayRotation(U8G2_R2);
   if (manage.has_ble_switch) {
     if (*(pBLEState + 7) == true) {
       manage.has_ble_switch = false;
@@ -704,11 +730,11 @@ void MeterUI::pageSwitchBLE() {
     }
     for (int i = 4; i < 6; i++) {
     }
-    screen_h.drawXBM(40, 24, 10, 16, bitmap_num_10x16[*(pBLEState + 1) / 0x10]);
-    screen_h.drawXBM(53, 24, 10, 16, bitmap_num_10x16[*(pBLEState + 1) % 0x10]);
-    screen_h.drawBox(66, 37, 3, 3);
-    screen_h.drawXBM(72, 24, 10, 16, bitmap_num_10x16[*(pBLEState) / 0x10]);
-    screen_h.drawXBM(85, 24, 10, 16, bitmap_num_10x16[*(pBLEState) % 0x10]);
+    screen_h.drawXBM(40, 28, 10, 16, bitmap_num_10x16[*(pBLEState + 1) / 0x10]);
+    screen_h.drawXBM(53, 28, 10, 16, bitmap_num_10x16[*(pBLEState + 1) % 0x10]);
+    screen_h.drawBox(66, 40, 3, 3);
+    screen_h.drawXBM(72, 28, 10, 16, bitmap_num_10x16[*(pBLEState) / 0x10]);
+    screen_h.drawXBM(85, 28, 10, 16, bitmap_num_10x16[*(pBLEState) % 0x10]);
   }
 }
 
@@ -727,8 +753,8 @@ void MeterUI::pageCaliMenu() {
 }
 
 void MeterUI::pageAutoCaliFlatness() {
-  screen_h.setFont(u8g2_font_helvB10_tr);
-  screen_h.drawStr(0, 12, "Flat Robot Cali");
+  screen_h.setFont(u8g2_font_helvB08_tr);
+  screen_h.drawStr(0, 12, "Flat Auto Cali");
   screen_h.drawBox(0, 14, 128, 2);
   if(manage.flat.state == FLAT_ROBOT_ARM_CALI){
     screen_h.drawStr(10,28, "Auto Cali ...");
@@ -741,25 +767,27 @@ void MeterUI::pageAutoCaliFlatness() {
 }
 
 void MeterUI::pageRobotCaliFlatness() {
-  screen_h.setFont(u8g2_font_helvB10_tr);
-  screen_h.drawStr(0, 14, "Flat Robot Cali");
-  screen_h.drawBox(0, 15, 128, 2);
+  screen_h.setFont(u8g2_font_helvB08_tr);   
+  String str = "Height:" + String(manage.flat.cali.step) + "mm ";
   if(manage.flat.state == FLAT_ROBOT_ARM_CALI){
-    screen_h.drawStr(18,28, "Flat Robot Cali...");
+    str += "Cali...";
   }else{
-    screen_h.drawStr(18,28, "Wait For Cmd");
+    str += "WaitCmd";
   }
-  String str = "Height: " + String(manage.flat.cali.step) + " mm";
-  screen_h.drawStr(18,40, str.c_str());
-  str = "MaxPeak: " + String(manage.max_filt_peak,0);
-  screen_h.drawStr(18,52, str.c_str());
+  screen_h.drawStr(0,8,str.c_str());
+  for (int i = 0; i < 8; i++) {
+    int x_offset = (i < 4) ? 0 : 64;
+    int y_offset = 19 + (i < 4 ? i : i - 4) * 11;
+    screen_h.drawStr(x_offset, y_offset, String(pDS->filt[i],0).c_str());
+    screen_h.drawStr(x_offset + 32, y_offset,String(pDS->filt_peak[i], 0).c_str());
+  }
   screen_h.drawXBM(18, 54, 92, 6, bitmap_h_loading);
   screen_h.drawBox(19, 55, manage.flat.progress * 0.9, 3);
 }
 
 void MeterUI::pageRobotCaliAngle() {
-  screen_h.setFont(u8g2_font_helvB10_tr);
-  screen_h.drawStr(0, 12, "Angle Robot Cali");
+  screen_h.setFont(u8g2_font_helvB08_tr);
+  screen_h.drawStr(0, 12, "Angle Robot Cali...");
   screen_h.drawBox(0, 14, 128, 2);
   char str[7] = "-----";
   dtostrf(pIMU->angle_raw[1], 7, 2, str);
@@ -784,7 +812,7 @@ void MeterUI::pageCalAngleCheck() {
   screen_h.setFont(u8g2_font_7x14B_tr);
   // YES_NO确认界面
   if (pIMU->cali_state == IMU_COMMON) {
-    screen_h.drawStr(0, 15, "AngleCali Ready?");
+    screen_h.drawStr(0, 15, "Angle Cali Ready?");
     pageOptionYesNo(pIMU->yes_no);
   }
   // 采集数据页面
@@ -799,41 +827,52 @@ void MeterUI::pageImuFactoryZero() {
   screen_h.setFont(u8g2_font_7x14B_tr);
   // YES_NO确认界面
   if (pIMU->cali_state == IMU_COMMON) {
-    screen_h.drawStr(0, 15, "AngleFactoryReady!!!?");
+    screen_h.drawStr(0, 15, "Angle Factory Ready?");
     pageOptionYesNo(pIMU->yes_no);
   }
   // 采集数据页面
   else if (pIMU->cali_state == IMU_FACTORY_ZERO) {
-    screen_h.drawStr(0, 15, "AngleFactoryZeroGoing!");
+    screen_h.drawStr(0, 15, "Angle Factory Going!");
     screen_h.drawFrame(12, 50, 104, 14);
     screen_h.drawBox(14, 52, pIMU->cali_progress, 10);
   }
 }
 
 void MeterUI::pageCaliFlatCheck() {
-  screen_h.setFont(u8g2_font_7x14B_tr);
+  screen_h.setFont(u8g2_font_helvB08_tr);
   // YES_NO确认界面
   if (manage.flat.state == FLAT_COMMON) {
-    screen_h.drawStr(0, 15, "FlatCali Ready?");
+    screen_h.drawStr(0, 10,  "Sensor Upward?");
     pageOptionYesNo(pDS->yes_no);
   }
   // 采集数据页面
   else if (manage.flat.state == FLAT_CALI_ZERO) {
-    screen_h.drawStr(0, 15, "FlatCali Going!");
-    screen_h.drawFrame(12, 50, 104, 14);
-    screen_h.drawBox(14, 52, pDS->cali_progress, 10);
+      screen_h.drawStr(0, 10,"Clean Check Going!");
+      for (int i = 0; i < 8; i++) {
+        int x_offset = (i < 4) ? 0 : 64;
+        int y_offset = 24 + (i < 4 ? i : i - 4) * 13;
+        String str = "";
+        if(pDS->raw[i] == 0)str = "S" + String(i + 1) + ": --";
+        else{
+          int pct = 100 - ((pDS->raw[i] - 100) / 2900.0) * 100;
+          if (pct < 0) pct = 0;
+          if (pct > 100)pct = 100;
+          str = "S" + String(i + 1) + ": " + String(pct) + "%";
+        }
+        screen_h.drawStr(x_offset, y_offset, str.c_str());
+      }
   }
 }
 
 void MeterUI::pageResetFactoryZero() {
   screen_h.setFont(u8g2_font_7x14B_tr);
   if (manage.reset_state == 0) {
-    screen_h.drawStr(0, 15, "ResetFactoryReady?");
+    screen_h.drawStr(0, 15, "Reset Factory Ready?");
     pageOptionYesNo(manage.ui_yes_no);
   }
   // 采集数据页面
   else if (manage.reset_state == 1) {
-    screen_h.drawStr(0, 15, "ResetFactoryGoing!");
+    screen_h.drawStr(0, 15, "Reset Factory Going!");
     screen_h.drawFrame(12, 50, 104, 14);
     screen_h.drawBox(14, 52, manage.ui_progress, 10);
   }
@@ -843,39 +882,42 @@ void MeterUI::pageFlatFactoryZero() {
   screen_h.setFont(u8g2_font_7x14B_tr);
   // YES_NO确认界面
   if (manage.flat.state == FLAT_COMMON) {
-    screen_h.drawStr(0, 15, "FlatFactory Ready?");
+    screen_h.drawStr(0, 15, "Flat Factory Ready?");
     pageOptionYesNo(pDS->yes_no);
   }
   // 采集数据页面
   else if (manage.flat.state == FLAT_FACTORY_ZERO) {
-    screen_h.drawStr(0, 15, "FlatFactory Going!");
+    screen_h.drawStr(0, 15, "Flat Factory Going!");
     screen_h.drawFrame(12, 50, 104, 14);
     screen_h.drawBox(14, 52, pDS->cali_progress, 10);
   }
 }
 
 void MeterUI::pageInfo(int selection) {
-  screen_h.setFont(u8g2_font_6x13_mr);
+  screen_h.setFont(u8g2_font_helvB08_tr);
   byte size = 10; 
   byte sensor_num = 0; 
-  String str_head = "";
+  String str = "";
   switch (selection) {
     case 0:
-      screen_h.drawStr(2, 8, "InfoPAGE:");
-      screen_h.drawStr(70,8, String(selection).c_str());
-      screen_h.drawStr(2, 18, "SOFTWARE:");
-      screen_h.drawStr(70,18, String(manage.version_software).c_str());
-      screen_h.drawStr(2, 28, "HARDWARE:");
-      screen_h.drawStr(70,28, String(manage.version_hardware).c_str());
-      screen_h.drawStr(2, 38, "IMU:");
-      screen_h.drawStr(70,38, String(manage.version_imu).c_str());
-      screen_h.drawStr(2, 48, "Battery:");
-      screen_h.drawStr(70,48, String(*pBattry).c_str());
-      screen_h.drawStr(2, 58, "Battery:");
-      screen_h.drawStr(70,58, String(*pBattry).c_str());
+      str = String(manage.local_name);
+      screen_h.drawStr( 2,8,str.c_str());
+
+      str = "Battery: " + String(*pBattry);
+      screen_h.drawStr( 2, 20, str.c_str());
+
+      str = "Software: " + String(manage.version_software);
+      screen_h.drawStr( 2, 34, str.c_str());
+
+      str = "Hardware: " + String(manage.version_hardware);
+      screen_h.drawStr( 2, 48, str.c_str());
+
+      str = "Sensor: " + String(manage.version_imu);
+      screen_h.drawStr( 2, 62, str.c_str());
+
       break;
     case 1:
-      screen_h.drawStr(0, 8, "Dist_Linear_FPeak");
+      screen_h.drawStr(0, 8, "Distance and FiltPeak");
       for (int i = 0; i < 8; i++) {
         int x_offset = (i < 4) ? 0 : 64;
         int y_offset = 20 + (i < 4 ? i : i - 4) * 14;
@@ -884,7 +926,7 @@ void MeterUI::pageInfo(int selection) {
       }
       break;
     case 2:
-      screen_h.drawStr(0, 8, "Filt_FPeak");
+      screen_h.drawStr(0, 8, "Filt and FiltPeak");
       for (int i = 0; i < 8; i++) {
         int x_offset = (i < 4) ? 0 : 64;
         int y_offset = 20 + (i < 4 ? i : i - 4) * 14;
@@ -893,7 +935,7 @@ void MeterUI::pageInfo(int selection) {
       }
       break;
     case 3:
-      screen_h.drawStr(0, 8, "Raw_RPeak");
+      screen_h.drawStr(0, 8, "Raw and RawPeak");
       for (int i = 0; i < 8; i++) {
         int x_offset = (i < 4) ? 0 : 64;
         int y_offset = 20 + (i < 4 ? i : i - 4) * 14;
@@ -906,80 +948,69 @@ void MeterUI::pageInfo(int selection) {
         pageImuInfo();
       break;
     case 5:
-      str_head = "SensorNum0:" + String(pDS->filt[0],0);
-      screen_h.drawStr(0, 8, str_head.c_str());
-      for (int i = 0; i < 11; i++) {
+      str = "SensorNum0:" + String(pDS->filt[0],0);
+      screen_h.drawStr(0, 8, str.c_str());
+      for (int i = 0; i < 12; i++) {
         int x_offset = (i % 4) * 32;
         int y_offset = 20 + + (i / 4) * 14;
         screen_h.drawStr(x_offset, y_offset, String(pDS->map_x[0][i],0).c_str());
       }
       break;
     case 6:
-      str_head = "SensorNum1:" + String(pDS->filt[1],0);
-      screen_h.drawStr(0, 8, str_head.c_str());
-      for (int i = 0; i < 11; i++) {
+      str = "SensorNum1:" + String(pDS->filt[1],0);
+      screen_h.drawStr(0, 8, str.c_str());
+      for (int i = 0; i < 12; i++) {
         int x_offset = (i % 4) * 32;
         int y_offset = 20 + (i / 4) * 14;
         screen_h.drawStr(x_offset, y_offset, String(pDS->map_x[1][i],0).c_str());
       }
       break;
     default:
-      screen_h.drawStr(2, 8, "EmptyPAGE:");
-      screen_h.drawStr(70,8, String(selection).c_str());
-      screen_h.drawStr(2, 18, "SOFTWARE:");
-      screen_h.drawStr(70,18, String(manage.version_software).c_str());
-      screen_h.drawStr(2, 28, "HARDWARE:");
-      screen_h.drawStr(70,28, String(manage.version_hardware).c_str());
-      screen_h.drawStr(2, 38, "IMU:");
-      screen_h.drawStr(70,38, String(manage.version_imu).c_str());
-      screen_h.drawStr(2, 48, "Battery:");
-      screen_h.drawStr(70,48, String(*pBattry).c_str());
-      screen_h.drawStr(2, 58, "Battery:");
-      screen_h.drawStr(70,58, String(*pBattry).c_str());
+      str = "EmptyPage" + String(selection);
+      screen_h.drawStr( 2,8,str.c_str());
+
+      str = "Battery: " + String(*pBattry);
+      screen_h.drawStr( 2, 20, str.c_str());
+
+      str = "Software: " + String(manage.version_software);
+      screen_h.drawStr( 2, 34, str.c_str());
+
+      str = "Hardware: " + String(manage.version_hardware);
+      screen_h.drawStr( 2, 48, str.c_str());
+
+      str = "Sensor: " + String(manage.version_imu);
+      screen_h.drawStr( 2, 62, str.c_str());
       break;
   }
 }
 void MeterUI::pageImuInfo() {
+  String str = "";
   screen_h.drawStr(0, 8, "IMU_INFO");
-  char U[8] = "-----";
-  dtostrf(pIMU->angle_user[1], 7, 2, U);
-  screen_h.drawStr(0, 20, "U:");
-  screen_h.drawStr(10, 20, U);
 
-  char X[8] = "-----";
-  dtostrf(pIMU->angle_raw[0], 7, 2, X);
-  screen_h.drawStr(0, 32, "X:");
-  screen_h.drawStr(10, 32, X);
+  str = "U:" + String(pIMU->angle_user[1],2);
+  screen_h.drawStr(0,20, str.c_str());
 
-  char Y[8] = "-----";
-  dtostrf(pIMU->angle_raw[1], 7, 2, Y);
-  screen_h.drawStr(0, 48, "Y:");
-  screen_h.drawStr(10, 48, Y);
+  str = "X:" + String(pIMU->angle_raw[0],2);
+  screen_h.drawStr(0,34, str.c_str());
 
-  char Z[8] = "-----";
-  dtostrf(pIMU->angle_raw[2], 7, 2, Z);
-  screen_h.drawStr(0, 62, "Z:");
-  screen_h.drawStr(10, 62, Z);
+  str = "Y:" + String(pIMU->angle_raw[1],2);
+  screen_h.drawStr(0,48, str.c_str());
 
-  char A[8] = "-----";
-  dtostrf(manage.auto_angle, 7, 2, A);
-  screen_h.drawStr(66, 20, "A:");
-  screen_h.drawStr(76, 20, A);
+  str = "Z:" + String(pIMU->angle_raw[2],2);
+  screen_h.drawStr(0,62, str.c_str());
 
-  char G[8] = "-----";
-  dtostrf(pIMU->_gravity, 7, 2, G);
-  screen_h.drawStr(66, 32, "G:");
-  screen_h.drawStr(76, 32, G);
+  str = "Gravity:" + String(pIMU->_gravity);
+  screen_h.drawStr(64,20, str.c_str());
 
-  char B[8] = "-----";
-  dtostrf(pIMU->b[1], 7, 2, B);
-  screen_h.drawStr(66, 48, "B:");
-  screen_h.drawStr(76, 48, B);
+  str = "Auto:" + String(manage.auto_angle,2);
+  screen_h.drawStr(64,34, str.c_str());
 
-  char E[8] = "-----";
-  dtostrf(pIMU->e[1], 7, 2, E);
-  screen_h.drawStr(66, 62, "E:");
-  screen_h.drawStr(76, 62, E);
+  str = "Z0:" + String(pIMU->b[1],2);
+  screen_h.drawStr(64,48, str.c_str());
+
+  str = "Z1:" + String(pIMU->e[1],2);
+  screen_h.drawStr(64,62, str.c_str());
+
 }
 
 void MeterUI::pageRobotCali() {
@@ -1132,6 +1163,7 @@ void MeterUI::DoBlock() {
   digitalWrite(SCREEN_CS1, LOW);
   screen_h.sendBuffer();
   digitalWrite(SCREEN_CS1, HIGH);
+  screen_h.clearBuffer();
 }
 
 void MeterUI::drawNum_10x16(int x, int y, String str, int size) {

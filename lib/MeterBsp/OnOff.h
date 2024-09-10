@@ -9,7 +9,7 @@ class OnOff
 {
 private:
     const int on_time = 1000;             /** @brief Time to trigger Long Press power off.*/
-    const int off_time = 1000;             /** @brief Time period for showing the power off image.*/
+    const int off_time = 2000;             /** @brief Time period for showing the power off image.*/
     int off_count = 0;
     MeterUI *pUI;
     SLED *p_led;
@@ -86,12 +86,12 @@ public:
         if (CommandSleep)
         {
             pUI->Block("Shutting Down", off_time);
-            ESP_LOGE("","Command Sleep");
+            ESP_LOGE("OnOff","Command Sleep");
         }
         else if (AutoSleep)
         {
-            pUI->Block("Auto Sleep", 5000);
-            ESP_LOGE("","Auto Sleep");
+            pUI->Block("Auto Sleep", off_time);
+            ESP_LOGE("OnOff","Auto Sleep");
         }
 
         // Power Off

@@ -34,9 +34,10 @@ enum CommStatus{
 public:
     void init(uint8_t Rx, uint8_t Tx);
     uint8_t unpack_step = STEP_FRAME_HEAD; 
-    char data_rx_buffer[64];
+    #define BUFFER_SIZE 64
+    char data_rx_buffer[BUFFER_SIZE];
     uint8_t data_rx_index;
-    char cali_rx_buffer[64];
+    char cali_rx_buffer[BUFFER_SIZE];
     uint8_t cali_rx_index;
     float info_parsed[10];
     bool has_new_data = false;
@@ -63,21 +64,20 @@ public:
     uint8_t measure_total = 10;
     uint8_t measure_count;
     float measure_sum;
-    float un_hold_th    = 1.5f;
+    float un_hold_th = 2.0f;
     float hold_ref;
-    float set_zero_th   = 0.5f;
+    void CollectCalDataFactory();
     int  ProcessMeasureFSM(); 
     void setParam(uint8_t mode);
     void onMeasureReset();
     float b[3] = {90.0f,90.0f,90.0f};
     float e[3] = {90.0f,90.0f,90.0f};
     uint8_t cali_state = IMU_COMMON;
-    bool yes_no = false;
-    const uint8_t avg_total = 20; 
+    bool yes_no = true;
     uint8_t avg_count = 0; 
     uint8_t _start_g; /** @brief _gravity direction when the angle collection start.Used to identify the severe change on IMU's attitude.*/
-    float _start_angle[3]; /** @brief Angle value when the angle collection start.Used to identify IMU's stability.*/
-    float _sum_angle[3]; /** @brief \b CollectCalData() collected angle summation.*/
+    float _start_angle; /** @brief Angle value when the angle collection start.Used to identify IMU's stability.*/
+    float _sum_angle; /** @brief \b CollectCalData() collected angle summation.*/
     float cali_progress = 0;
     void CollectCalData();
     void ClearZeros();
