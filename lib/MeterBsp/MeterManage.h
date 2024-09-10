@@ -118,6 +118,20 @@ byte meter_type = TYPE_2_0;
   }
 
   void updateMeasure(){
+#ifdef SHOW_BOTH_DATA
+    if(home_mode == HOME_FLATNESS){
+      measure.state    = flat.measure.state;
+      measure.progress = flat.measure.progress;
+    }
+    else if(home_mode == HOME_AUTO){
+      measure.state    = flat.measure.state < clino.measure.state ? flat.measure.state : clino.measure.state;
+      measure.progress = flat.measure.progress < clino.measure.progress ? flat.measure.progress : clino.measure.progress;
+    }
+    else{
+      measure.state    = clino.measure.state;
+      measure.progress = clino.measure.progress;
+    }
+#else
     if(home_mode == HOME_FLATNESS){
       measure.state    = flat.measure.state;
       measure.progress = flat.measure.progress;
@@ -130,6 +144,7 @@ byte meter_type = TYPE_2_0;
       measure.state    = clino.measure.state;
       measure.progress = clino.measure.progress;
     }
+#endif
   }
 
   void resetMeasure(){
@@ -186,8 +201,7 @@ byte meter_type = TYPE_2_0;
   }
 
   void set_flat_live(float value,int arrow){
-    if(value >= 50){value = 99.9f;}
-    if(value <= 0.5)value = 0;
+    if(value < 0.5)value = 0;
     flat.arrow_live = arrow;
     flat.flat_live  = value;
   }
@@ -317,7 +331,7 @@ void WarningLightFSM(){
         }
       }
     }
-    // ControlWarningLight(2);
+    ControlWarningLight(2);
   }
   else {
     ControlWarningLight(0);

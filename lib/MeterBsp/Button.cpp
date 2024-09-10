@@ -27,6 +27,10 @@ void Button::Update() {
       manage.start_flatness_measure();
     }
     else if(manage.home_mode == HOME_AUTO){
+#ifdef SHOW_BOTH_DATA
+      manage.start_clino_measure();
+      manage.start_flatness_measure();
+#else
       if(manage.auto_mode_select == HOME_AUTO_SLOPE){
       manage.start_clino_measure();
       }else if(manage.auto_mode_select == HOME_AUTO_FLATNESS){
@@ -35,7 +39,9 @@ void Button::Update() {
       manage.start_clino_measure();
       manage.start_flatness_measure();
       }
+#endif
     }
+
     *(pBLEState + 8) = *(pBLEState + 6);
   }
   /* FSM */

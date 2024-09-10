@@ -52,6 +52,7 @@ public:
     float zeros[8]  = {0};
     float ft_zeros[8]  = {0};  
     float hold_ref = 0;
+    float measure_avg = 0;
     float stable_ref = 0;
     float measure_sum = 0;
     float max_dist_num = 0;
@@ -64,7 +65,7 @@ void  init();
     bool adc_online[4] = {false};
     bool sensor_valid[8] = {false};
     byte max_sensor = 0;
-    const float dist_th = 50.0f;
+    const float dist_th = 88.8f;
     MedianFilter median;
     std::vector<float> filt_vec[8];
     std::vector<int> raw_vec[8];

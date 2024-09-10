@@ -366,7 +366,9 @@ void MeterUI::Primary_DrawSlope() {
 
 void MeterUI::Primary_DrawFlat() {
   screen_h.drawXBM(110, 30, 17, 15, BITMAP_UNIT_MM);
-
+  if (flat_show > flat_ui_th) {
+    screen_h.drawXBM(LINE_LHX, LINE_LHY, 45, 3, Main_Dash_45x3);
+  } else {
   if (measure_state == M_MEASURE_DONE || measure_state == M_UPLOAD_DONE) {
     screen_h.setDrawColor(2);
     screen_h.drawBox(3, 20, 35, 24);
@@ -375,10 +377,6 @@ void MeterUI::Primary_DrawFlat() {
     screen_h.drawXBM(6, 24, 10, 16, bitmap_num_10x16[dash_num]);
     screen_h.setDrawColor(1);
   }
-  
-  if (flat_show > flat_ui_th) {
-    screen_h.drawXBM(LINE_LHX, LINE_LHY, 45, 3, Main_Dash_45x3);
-  } else {
     dtostrf(flat_show, 6, 1, str_show);
     drawNum_16x24(NUM_LHX, NUM_LHY, str_show, 6);
   }
@@ -386,15 +384,29 @@ void MeterUI::Primary_DrawFlat() {
 
 void MeterUI::Primary_DrawFlatSlope() {
 #ifdef SHOW_BOTH_DATA
-  screen_h.drawXBM(18, 15, 14, 14, bitmap_flat_icon);
-  screen_h.drawXBM(97, 16, 17, 15, BITMAP_UNIT_MM);
-  dtostrf(slope_show, 6, 1, str_show);
-  drawNum_10x16(37, 35, str_show,6);
-  
-  screen_h.drawXBM(18, 36, 14, 14, bitmap_slope_icon);
-  screen_h.drawXBM(97, 38, 17, 15, BITMAP_UNIT_MMM);
-  dtostrf(flat_show, 6, 1, str_show);
-  drawNum_10x16(37, 15, str_show,6);
+  screen_h.drawXBM(93, 14, 17, 15, BITMAP_UNIT_MM);
+  if (flat_show > flat_ui_th) {
+    screen_h.drawXBM(40, 22, 45, 3, Main_Dash_45x3);
+  } else {
+    if (measure_state == M_MEASURE_DONE || measure_state == M_UPLOAD_DONE) {
+      screen_h.setDrawColor(2);
+      screen_h.drawBox(3, 20, 29, 24);
+      screen_h.setDrawColor(0);
+      screen_h.drawXBM(6,24, 10, 16, bitmap_num_10x16[dash_num]);
+      screen_h.drawXBM(18,24, 10, 16, bitmap_hash_s);
+      screen_h.setDrawColor(1);
+    }
+    char show[6];
+    dtostrf(flat_show, 6, 1, show);
+    drawNum_10x16(30, 14, show,6);
+  }
+
+  screen_h.drawBox(33, 32, 77, 2);
+
+  screen_h.drawXBM(93, 39, 17, 15, BITMAP_UNIT_MMM);
+  dtostrf(slope_show, 6, 1, str_slope);
+  drawNum_10x16(30, 36, str_slope,6);
+
 #else
   if (manage.auto_mode_select == HOME_AUTO_FLATNESS) {
     screen_h.drawXBM(5, 25, 14, 14, bitmap_flat_icon);
@@ -416,8 +428,8 @@ void MeterUI::Primary_DrawFlatSlope() {
   } else {
     screen_h.drawXBM(5, 25, 14, 14, bitmap_vertical_icon);
     screen_h.drawXBM(108, 31, 17, 15, BITMAP_UNIT_MMM);
-    dtostrf(slope_show, 6, 1, str_show);
-    drawNum_16x24(NUM_LHX, NUM_LHY, str_show, 6);
+    dtostrf(slope_show, 6, 1, str_slope);
+    drawNum_16x24(NUM_LHX, NUM_LHY, str_slope, 6);
   }
 #endif
 }
@@ -510,35 +522,34 @@ void MeterUI::Minor_DrawFlat() {
   if (rotation == VERTICAL) {
     screen_s.drawXBM(26, 3, 14, 14, bitmap_flat_icon);
     screen_s.drawXBM(41, 72, 17, 15, BITMAP_UNIT_MM);
-    if (measure_state == M_MEASURE_DONE || measure_state == M_UPLOAD_DONE) {
-      screen_s.setDrawColor(2);
-      screen_s.drawBox(2, 22, 60, 24);
-      screen_s.setDrawColor(0);
-      screen_s.drawXBM(20, 26, 10, 16, bitmap_num_10x16[dash_num]);
-      screen_s.drawXBM(33, 26, 10, 16, bitmap_hash_s);
-      screen_s.setDrawColor(1);
-    }
+
     if (flat_show > flat_ui_th) {
       screen_s.drawXBM(LINE_LVX, LINE_LVY, 45, 3, Main_Dash_45x3);
     } else {
+      if (measure_state == M_MEASURE_DONE || measure_state == M_UPLOAD_DONE) {
+        screen_s.setDrawColor(2);
+        screen_s.drawBox(2, 22, 60, 24);
+        screen_s.setDrawColor(0);
+        screen_s.drawXBM(20, 26, 10, 16, bitmap_num_10x16[dash_num]);
+        screen_s.drawXBM(33, 26, 10, 16, bitmap_hash_s);
+        screen_s.setDrawColor(1);
+      }
       dtostrf(flat_show, 6, 1, str_show);
       Minor_drawNum_10x16(NUM_LVX, NUM_LVY, str_show, 6);
     }
   } else {
-    screen_s.drawXBM(0, 24, 14, 14, bitmap_flat_icon);
     screen_s.drawXBM(110, 30, 17, 15, BITMAP_UNIT_MM);
-    if (measure_state == M_MEASURE_DONE || measure_state == M_UPLOAD_DONE) {
-      screen_s.setDrawColor(2);
-      screen_s.drawBox(3, 20, 35, 24);
-      screen_s.setDrawColor(0);
-      screen_s.drawXBM(6, 24, 10, 16, bitmap_num_10x16[dash_num]);
-      screen_s.drawXBM(18, 24, 10, 16, bitmap_hash_s);
-      screen_s.setDrawColor(1);
-    }
-
     if (flat_show > flat_ui_th) {
       screen_s.drawXBM(LINE_LHX, LINE_LHY, 45, 3, Main_Dash_45x3);
     } else {
+        if (measure_state == M_MEASURE_DONE || measure_state == M_UPLOAD_DONE) {
+          screen_s.setDrawColor(2);
+          screen_s.drawBox(3, 20, 35, 24);
+          screen_s.setDrawColor(0);
+          screen_s.drawXBM(6, 24, 10, 16, bitmap_num_10x16[dash_num]);
+          screen_s.drawXBM(18, 24, 10, 16, bitmap_hash_s);
+          screen_s.setDrawColor(1);
+        }
         dtostrf(flat_show, 6, 1, str_show);
         Minor_drawNum_16x24(NUM_LHX, NUM_LHY, str_show, 6);
     }
@@ -548,38 +559,76 @@ void MeterUI::Minor_DrawFlat() {
 void MeterUI::Minor_DrawFlatSlope() {
 #ifdef SHOW_BOTH_DATA
 if (rotation == VERTICAL) {
-  screen_s.drawXBM(44, 60, 17, 15, BITMAP_UNIT_MM);
-  if (measure_state == M_MEASURE_DONE || measure_state == M_UPLOAD_DONE) {
-    screen_s.setDrawColor(2);
-    screen_s.drawBox(2, 22, 60, 24);
-    screen_s.setDrawColor(0);
-    screen_s.drawXBM(20, 4, 10, 16, bitmap_num_10x16[dash_num]);
-    screen_s.drawXBM(33, 4, 10, 16, bitmap_hash_s);
-    screen_s.setDrawColor(1);
-  }
+  // screen_s.drawXBM(44, 60, 17, 15, BITMAP_UNIT_MM);
+  // if (measure_state == M_MEASURE_DONE || measure_state == M_UPLOAD_DONE) {
+  //   screen_s.setDrawColor(2);
+  //   screen_s.drawBox(2, 22, 60, 24);
+  //   screen_s.setDrawColor(0);
+  //   screen_s.drawXBM(20, 4, 10, 16, bitmap_num_10x16[dash_num]);
+  //   screen_s.drawXBM(33, 4, 10, 16, bitmap_hash_s);
+  //   screen_s.setDrawColor(1);
+  // }
+  // if (flat_show > flat_ui_th) {
+  //   screen_s.drawXBM(6, 49, 45, 3, Main_Dash_45x3);
+  // } else {
+  //   dtostrf(flat_show, 6, 1, str_show);
+  //   Minor_drawNum_10x16(6, 49, str_show, 6);
+  // }
+
+  // screen_s.drawBox(2, 71, 60, 2);
+
+  // screen_s.drawXBM(44, 81, 17, 15, BITMAP_UNIT_MMM);
+  // dtostrf(slope_show, 6, 1, str_slope);
+  // Minor_drawNum_10x16(2, 80, str_slope, 6);
+  screen_s.drawXBM(41, 48, 17, 15, BITMAP_UNIT_MM);
   if (flat_show > flat_ui_th) {
-    screen_s.drawXBM(6, 49, 45, 3, Main_Dash_45x3);
+    screen_s.drawXBM(20, 36, 45, 3, Main_Dash_45x3);
   } else {
-    dtostrf(flat_show, 6, 1, str_show);
-    Minor_drawNum_10x16(6, 49, str_show, 6);
+    if (measure_state == M_MEASURE_DONE || measure_state == M_UPLOAD_DONE) {
+        screen_s.setDrawColor(2);
+        screen_s.drawBox(0, 22, 23, 24);
+        screen_s.setDrawColor(0);
+        screen_s.drawXBM(1,26, 10, 16, bitmap_num_10x16[dash_num]);
+        screen_s.drawXBM(12,26, 10, 16, bitmap_hash_s);
+        screen_s.setDrawColor(1);
+    }
+    char show[4];
+    dtostrf(flat_show, 4, 1, show);
+    Minor_drawNum_10x16(27, 28, show, 4);
   }
 
-  screen_s.drawBox(2, 71, 60, 2);
+  screen_s.drawBox(2, 60, 60, 2);
 
-  screen_s.drawXBM(44, 81, 17, 15, BITMAP_UNIT_MMM);
-  dtostrf(slope_show, 6, 1, str_show);
-  Minor_drawNum_10x16(2, 80, str_show, 6);
+  // screen_s.drawXBM(41, 83, 17, 15, BITMAP_UNIT_MMM);
+  // dtostrf(slope_show, 6, 1, str_slope);
+  // Minor_drawNum_10x16(2, 63, str_slope, 6);
+  screen_s.drawXBM(41, 86, 17, 15, BITMAP_UNIT_MMM);
+  dtostrf(slope_show, 6, 1, str_slope);
+  Minor_drawNum_10x16(4, 66, str_slope, 6);
 }
 else{
-  screen_s.drawXBM(18, 15, 14, 14, bitmap_flat_icon);
-  screen_s.drawXBM(97, 16, 17, 15, BITMAP_UNIT_MM);
-  dtostrf(slope_show, 6, 1, str_show);
-  drawNum_10x16(37, 35, str_show,6);
-  
-  screen_s.drawXBM(18, 36, 14, 14, bitmap_slope_icon);
-  screen_s.drawXBM(97, 38, 17, 15, BITMAP_UNIT_MMM);
-  dtostrf(flat_show, 6, 1, str_show);
-  drawNum_10x16(37, 15, str_show,6);
+  screen_s.drawXBM(93, 14, 17, 15, BITMAP_UNIT_MM);
+  if (flat_show > flat_ui_th) {
+    screen_s.drawXBM(40, 22, 45, 3, Main_Dash_45x3);
+  } else {
+    if (measure_state == M_MEASURE_DONE || measure_state == M_UPLOAD_DONE) {
+      screen_s.setDrawColor(2);
+      screen_s.drawBox(3, 20, 29, 24);
+      screen_s.setDrawColor(0);
+      screen_s.drawXBM(6,24, 10, 16, bitmap_num_10x16[dash_num]);
+      screen_s.drawXBM(18,24, 10, 16, bitmap_hash_s);
+      screen_s.setDrawColor(1);
+    }
+    char show[6];
+    dtostrf(flat_show, 6, 1, show);
+    Minor_drawNum_10x16(30, 14, show,6);
+  }
+
+  screen_s.drawBox(33, 32, 77, 2);
+
+  screen_s.drawXBM(93, 39, 17, 15, BITMAP_UNIT_MMM);
+  dtostrf(slope_show, 6, 1, str_slope);
+  Minor_drawNum_10x16(30, 36, str_slope,6);
 }
 #else
   if (rotation == VERTICAL) {
@@ -603,7 +652,7 @@ else{
     } else {
       screen_s.drawXBM(27, 2, 14, 14, bitmap_vertical_icon);
       screen_s.drawXBM(41, 72, 17, 15, BITMAP_UNIT_MMM);
-      dtostrf(slope_show, 6, 1, str_show);
+      dtostrf(slope_show, 6, 1, str_slope);
       Minor_drawNum_10x16(NUM_LVX, NUM_LVY, str_show, 6);
     }
   } else {
@@ -627,7 +676,7 @@ else{
     } else {
       screen_s.drawXBM(5, 25, 14, 14, bitmap_vertical_icon);
       screen_s.drawXBM(108, 31, 17, 15, BITMAP_UNIT_MMM);
-      dtostrf(slope_show, 6, 1, str_show);
+      dtostrf(slope_show, 6, 1, str_slope);
       Minor_drawNum_16x24(NUM_LHX, NUM_LHY, str_show, 6);
     }
   }

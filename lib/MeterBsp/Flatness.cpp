@@ -109,19 +109,20 @@ int Flatness::ProcessMeasureFSM() {
   if (refer_peak > 30) {
     measure_count = 0;
     return state = M_UNSTABLE;
-  }else {
-    measure_count++;
   }
+  measure_count++;
+  measure_avg += measure_source; 
+  int pro = measure_count * 100.0 / 10.0;
+  manage.set_flat_progress(pro);
   if(measure_count == 10){
     measure_count = 0;
-    manage.flat.flat_hold = measure_source;
+    manage.flat.flat_hold= measure_avg / 10;
+    measure_avg = 0;
     manage.max_sensor_num = max_dist_num;
     hold_ref = measure_source;
     manage.set_flat_progress(100);
     return state = M_MEASURE_DONE;
   }
-  int pro = measure_count * 100.0 / 10.0;
-  manage.set_flat_progress(pro);
   return state = M_MEASURE_ING;
 }
 
@@ -352,9 +353,9 @@ void Flatness::getFlatness() {
     }
   }
   if(manage.flat_abs){
-    flat = valid_size < 1 ? 99.0f : max;
+    flat = valid_size < 1 ? 88.8f : max;
   }else{
-    flat = valid_size < 2 ? 99.0f : max - min;
+    flat = valid_size < 2 ? 88.8f : max - min;
   }
   manage.set_flat_live(modifyDecimal(flat), 0);
 }

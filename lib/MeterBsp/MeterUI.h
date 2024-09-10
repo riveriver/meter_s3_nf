@@ -29,7 +29,7 @@ private:
     byte rotation = 0;
     byte g_this = 0;
     byte g_last = 1;
-    byte flat_ui_th = 90;
+    byte flat_ui_th = 88.8f;
     uint8_t bar_timer = 0;
     String  block_info = "";
     void Flip();
