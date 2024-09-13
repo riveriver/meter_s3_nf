@@ -110,7 +110,9 @@ static void comm_task(void *pvParameter) {
       ble.SendHome(&app_home);
       ble.SendAngle(manage.clino.angle_hold);
       ble.SendSlope(manage.clino.slope_hold);
-      ble.SendFlatness(manage.flat.flat_hold);
+      char temp_show[4];
+      dtostrf(manage.flat.flat_hold, 4, 1, temp_show);
+      ble.SendFlatness(strtof(temp_show, NULL));
       manage.measure.state = M_UPLOAD_DONE;
       manage.clino.measure.state = M_UPLOAD_DONE;
       manage.flat.measure.state = M_UPLOAD_DONE;

@@ -118,7 +118,7 @@ byte meter_type = TYPE_2_0;
   }
 
   void updateMeasure(){
-#ifdef SHOW_BOTH_DATA
+#ifdef SHOW_BOTH_MODE
     if(home_mode == HOME_FLATNESS){
       measure.state    = flat.measure.state;
       measure.progress = flat.measure.progress;
@@ -136,10 +136,21 @@ byte meter_type = TYPE_2_0;
       measure.state    = flat.measure.state;
       measure.progress = flat.measure.progress;
     }
+#ifdef JIAN_FA_MODE
+    else if(home_mode == HOME_AUTO  && auto_mode_select == HOME_AUTO_SLOPE){
+      measure.state    = flat.measure.state < clino.measure.state ? flat.measure.state : clino.measure.state;
+      measure.progress = flat.measure.progress < clino.measure.progress ? flat.measure.progress : clino.measure.progress;
+    }
     else if(home_mode == HOME_AUTO && auto_mode_select == HOME_AUTO_FLATNESS){
       measure.state    = flat.measure.state;
       measure.progress = flat.measure.progress;
     }
+#else
+    else if(home_mode == HOME_AUTO && auto_mode_select == HOME_AUTO_FLATNESS){
+      measure.state    = flat.measure.state;
+      measure.progress = flat.measure.progress;
+    }
+#endif
     else{
       measure.state    = clino.measure.state;
       measure.progress = clino.measure.progress;

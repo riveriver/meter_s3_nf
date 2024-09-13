@@ -160,6 +160,11 @@ void BLE::sendSyncInfo() {
   ControlChar->notify(true);
   ControlChar->setValue((manage.home_mode) + HOME_MODE_BASE * 1000);
   ControlChar->notify(true);
+#ifdef JIAN_FA_MODE
+  ControlChar->setValue(3101);
+  ControlChar->notify(true);
+#endif
+
 }
 
 void BLE::QuickNotifyEvent() {
