@@ -167,8 +167,9 @@ uint8_t IMU42688::Update() {
       AngleCope[i - 1] = info_parsed[i];
     }
     // 3. Update angle data
+    // HACK
     memmove(&angle_raw[0], &AngleCope[0], sizeof(angle_raw));
-    memmove(&angle_raw_show[0], &AngleCope[3], sizeof(angle_raw_show));
+    memmove(&angle_raw_show[0], &AngleCope[0], sizeof(angle_raw_show));
 
     angle_user[0] = angle_std[0] = angle_cali[0] = angle_raw[0];
     angle_user_show[0] = angle_std_show[0] = angle_cali_show[0] = angle_raw_show[0];
@@ -250,7 +251,7 @@ void IMU42688::QuickCalibrate() {
   // Collect angle data.
     // Check if the angle data already been load.
     if (!has_new_data)return;
-    else has_new_data = false;
+    has_new_data = false;
     byte avg_total = 20;
 
     // Initialize the collection
@@ -262,7 +263,8 @@ void IMU42688::QuickCalibrate() {
     }
 
     // If the IMU's reading outside the threshold, restart the collection.
-    if(fabs(angle_raw[1] - _start_angle > 0.1))
+    manage.stable_error = fabs(angle_raw[1] - _start_angle);
+    if(manage.stable_error > 0.1)
     {
         avg_count = 0;
         return;
@@ -272,10 +274,17 @@ void IMU42688::QuickCalibrate() {
     avg_count++;
 
  if (avg_count == avg_total){
+#ifdef JIAN_FA_MODE
+    pref.begin("Angle_Cal", false);
+    e[1] = 90 - _sum_angle / avg_total;
+    pref.putFloat("Ey", e[1]);
+    pref.end();
+#else
     pref.begin("Angle_Cal", false);
     e[1] = 0 - _sum_angle / avg_total;
     pref.putFloat("Ey", e[1]);
     pref.end();
+#endif
     avg_count = 0;
     _sum_angle = 0;
     cali_state = IMU_COMPLETE;
@@ -304,7 +313,8 @@ void IMU42688::CaliFactoryZero() {
     }
 
     // If the IMU's reading outside the threshold, restart the collection.
-    if(fabs(angle_raw[1] - _start_angle > 0.05))
+    manage.stable_error = fabs(angle_raw[1] - _start_angle);
+    if(manage.stable_error > 0.05)
     {
         avg_count = 0;
         return;

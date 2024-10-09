@@ -36,8 +36,8 @@ private:
     void DoBlock();
     void drawNum_10x16(int x,int y,String str,int size);
     void drawNum_16x24(int x,int y,String str,int size);
-    void Minor_drawNum_10x16(int x, int y,String str,int size);
-    void Minor_drawNum_16x24(int x, int y,String str,int size);
+    void Sub_drawNum_10x16(int x, int y,String str,int size);
+    void Sub_drawNum_16x24(int x, int y,String str,int size);
     /* ----- Menu -----*/
     void pageCaliMenu();
     void pageSwitchBLE();
@@ -64,12 +64,13 @@ private:
     void Primary_DrawFlat();
     void Primary_DrawFlatSlope();
     void Primary_DrawHome();
-    void Minor_DrawCommon();
-    void Minor_DrawArrow(); 
-    void Minor_DrawAngle();
-    void Minor_DrawSlope();
-    void Minor_DrawFlat();
-    void Minor_DrawFlatSlope();
+    void Sub_DrawHome();
+    void Sub_DrawCommon();
+    void Sub_DrawArrow(); 
+    void Sub_DrawAngle();
+    void Sub_DrawSlope();
+    void Sub_DrawFlat();
+    void Sub_DrawFlatSlope();
 public:  
     int *pBattry;
     uint8_t *pBLEState;

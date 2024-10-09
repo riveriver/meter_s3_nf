@@ -497,7 +497,7 @@
                 ]
             },
             "defines": [
-                "PLATFORMIO=60115",
+                "PLATFORMIO=60116",
                 "ARDUINO_ESP32S3_DEV",
                 "ARDUINO_USB_MODE=1",
                 "ARDUINO_RUNNING_CORE=1",
@@ -506,6 +506,8 @@
                 "HARDWARE_3_0",
                 "SENSOR_1_4",
                 "JIAN_FA_MODE",
+                "ENGLISH_MODE",
+                "DEVELOPER_MODE",
                 "HAVE_CONFIG_H",
                 "MBEDTLS_CONFIG_FILE=\"mbedtls/esp_config.h\"",
                 "UNITY_INCLUDE_CONFIG_H",

@@ -23,27 +23,39 @@
 TwoWire wire_host = TwoWire(0);
 TwoWire wire_sub = TwoWire(1);
 
+void scanI2CBus(TwoWire &wire, uint8_t startAddr, uint8_t endAddr) {
+  String str = "[I2C Bus Scan] ";
+  for (uint8_t addr = startAddr; addr <= endAddr; addr++) {
+    wire.beginTransmission(addr); // 尝试与当前地址的设备通信
+    int error = wire.endTransmission(); // 结束传输并获取错误代码
+    if (!error) {
+      // 如果设备响应，打印其地址
+      str += String(addr, HEX) + ",";
+      // 这里可以添加代码来初始化设备，例如：
+      // for (int i = 0; i < ADS_NUM; i++) {
+      //   if (!ads_init[i]) {
+      //     ads_init[i] = ads1115[i].begin(addr, &wire);
+      //     break; // 假设每个地址只有一个设备
+      //   }
+      // }
+    }
+    delay(10); // 在尝试下一个地址之前等待一段时间
+  }
+  Serial.println(str); // 打印扫描结果
+}
+
 void Flatness::init() {
 #ifdef SENSOR_1_1
   wire_host.begin(8, 9, 400000U);
   delay(10);
+  scanI2CBus(wire_host, 0x48, 0x4B);
   wire_sub.begin(4, 5, 400000U);
   delay(10);
-  TwoWire *p_wire;
-  String str = "[ads_init]";
-  for(int i = 0;i < 8; i++){
-    p_wire = i < 4 ? &wire_host : &wire_sub;
-    int addr = 0x48 + i % 4;
-    p_wire->beginTransmission(addr);
-    if (HandleError_Wire(p_wire->endTransmission(), addr)) {
-      ads_init[i] = ads1115[i].begin(addr, p_wire);
-      str += String(ads_init[i]) + ",";
-    }
-    delay(10);
-  }
-  // Serial.println(str);
+  scanI2CBus(wire_sub, 0x48, 0x4B);
+  return;
 
 #elif defined(SENSOR_1_2)
+ 
   /*
    wire_host-->1#:0x49C0; 2#:0x49C1; 
    wire_sub -->3#:0x49C0; 4#:0x49C1;
@@ -52,11 +64,13 @@ void Flatness::init() {
   delay(10);
   wire_sub.begin(4, 5, 400000U);
   delay(10);
+
   TwoWire *p_wire;
   String str = "[ads_init]";
   for(int i = 0;i < ADS_NUM; i++){
-    p_wire = i == 0 ? &wire_host : &wire_sub;
-    int addr = 0x49;
+    p_wire = i < 2 ? &wire_host : &wire_sub;
+    // HACK
+    int addr = 0x48 + i;
     p_wire->beginTransmission(addr);
     if (HandleError_Wire(p_wire->endTransmission(), addr) == true) {
       ads_init[i] = ads1115[i].begin(addr, p_wire);
@@ -64,7 +78,7 @@ void Flatness::init() {
     }
     delay(10);
   }
-  // Serial.println(str);
+  Serial.println(str);
 
 #elif defined(SENSOR_1_4)
   wire_host.begin(8, 9, 400000U);
@@ -88,6 +102,10 @@ void Flatness::init() {
   // Serial.println(str);
 #endif
   getFitParams();
+  // for (int i = 0; i < SENSOR_NUM; i++) {
+  //   map_x[i][11] = map_x[i][10] - 200;
+  // }
+  // putFitParams();
   for(int i = 0; i < SENSOR_NUM; i++){
     raw_vec[i].resize(30);
     filt_vec[i].resize(5);
@@ -139,27 +157,40 @@ void Flatness::UpdateAllInOne() {
   byte channel_num = 2;
   for (int i = 0; i < ADS_NUM; i++) {
     p_wire = (i * channel_num < 4) ? &wire_host : &wire_sub;
-    byte addr = 0x49;
+    byte addr = 0x48 + i;
     // check ads online
     p_wire->beginTransmission(addr);
     // if ads offline, set adc_online[i] = false,continue
     if (p_wire->endTransmission() != 0){
-      adc_online[i] = false;
       for (int j = 0; j < channel_num; j++) {
         byte id = i * channel_num + j;
-        raw[id] = 0;
+        raw[id]  = 0;
         filt[id] = 0;
         dist[id] = -1;
+        raw_peak[id] = 0;
+        filt_peak[id] = 0;
+        sensor_valid[id] = false;
+      }
+      if(adc_online[i] == true){
+        adc_online[i] = false;
+        manage.flat.adc_online[i] = false;
+        if(i == 2){
+          manage.ui_block_info = "1m_Mode";
+        }
       }
       continue;
     }
-    // ads first online
-    if(ads_init[i] == false) {
-      ads_init[i] = ads1115[i].begin(addr, p_wire);
-    }
-    // ads online
+
+    // ADC online
     if(adc_online[i] == false){
       adc_online[i] = true;
+      manage.flat.adc_online[i] = true;
+      if(i == 2){
+        manage.ui_block_info = "2m_Mode";
+      }
+    }
+    if(ads_init[i] == false){
+      ads_init[i] = ads1115[i].begin(addr, p_wire);
     }
     // read 
     for (int j = 0; j < channel_num; j++) {
@@ -167,25 +198,44 @@ void Flatness::UpdateAllInOne() {
       // id check
       if(id >= SENSOR_NUM)continue;
       raw[id] = ads1115[i].readADC_SingleEnded(j);
-      // 通过调用erase函数删除vector的第一个元素,再使用push_back函数将raw[id]添加到vector的末尾
+      // raw over th,return
+      if(raw[id] < 5000){
+        filt[id] = 0;
+        filt_peak[id] = 0;
+        dist[id] = -2;
+        sensor_valid[id] = false;
+        continue;
+      }
+
+      // get flag
+      sensor_valid[id] = true;
+
+      // get raw vec
       if (raw_vec[id].size() == raw_vec[id].capacity()) {
         raw_vec[id].erase(raw_vec[id].begin());
       }
       raw_vec[id].push_back(raw[id]);
-      // HACK calculate raw peak
-      float  raw_max = *std::max_element(raw_vec[id].begin(), raw_vec[id].end());
-      float  raw_min = *std::min_element(raw_vec[id].begin(), raw_vec[id].end());
-      raw_peak[id] = raw_max - raw_min; 
-      // filt
-      filt[id] = median.calculateMedian(raw_vec[id]);
+      std::vector<int> raw_temp = raw_vec[id];
+
+      // debug raw_peak
+      if(manage.debug_flat_mode == 21){
+        float  raw_max = *std::max_element(raw_vec[id].begin(), raw_vec[id].end());
+        float  raw_min = *std::min_element(raw_vec[id].begin(), raw_vec[id].end());
+        raw_peak[id] = raw_max - raw_min;
+      }
+
+      // get_filt
+      filt[id] = median.calculateMedian(raw_temp);
       if (filt_vec[id].size() == filt_vec[id].capacity()) {
         filt_vec[id].erase(filt_vec[id].begin());
       }
-      // HACK calculate filt peak
+      
+      // get filt_peak
       filt_vec[id].push_back(filt[id]);
       float  filt_max = *std::max_element(filt_vec[id].begin(), filt_vec[id].end());
       float  filt_min = *std::min_element(filt_vec[id].begin(), filt_vec[id].end());
       filt_peak[id] = filt_max - filt_min; 
+
       // map distance
       mapDist(id,filt[id]);
     }

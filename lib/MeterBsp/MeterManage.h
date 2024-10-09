@@ -27,7 +27,9 @@ public:
   /* angel */
   ClinoMeter  clino;
   float auto_angle = 0.0f;
-  float slope_std = 1000.0f;
+  float test_angle = 0.0f;
+  float slope_std = 2000.0f;
+  float stable_error = 0;
   byte speed_mode  = SPEED_MODE_QUICK;
   /* flatness */
   FlatnessMeter flat;
@@ -93,7 +95,6 @@ byte meter_type = TYPE_2_0;
   void initMeter(){
     // get params from flash
     pref.begin("Meter",false);
-    meter_type = pref.getInt("Type",TYPE_2_0);
     home_mode  = pref.getInt("Home",HOME_ANGLE);
     speed_mode = pref.getInt("Speed",SPEED_MODE_QUICK);
     warn_light_onoff = pref.getInt("WarnMode",true);
@@ -365,7 +366,9 @@ float roundToZeroOrFive(float value,int bits) {
     }
 }
 
+// HACK 
 float ConvertToSlope(float angle) {
+  test_angle = angle;
   bool sign = (angle > 0);
   float slope = 0;
   if(fabs(angle) <= 45.0f){

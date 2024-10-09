@@ -19,6 +19,43 @@ void Button::Update() {
   bool Press_Back  = Press[3];
   bool Press_Enter = Press[4];
   bool Press_Light = Press[5];
+#ifdef JIAN_FA_MODE
+  if(manage.page == PAGE_ZERO_ANGLE && Press_Light && pIMU->yes_no){
+    pIMU->cali_state = IMU_CALI_ZERO;
+  }
+  else if(Press_Light && CanMeasure()) {
+    if(manage.home_mode == HOME_ANGLE || manage.home_mode == HOME_SLOPE){
+      manage.start_clino_measure();
+    }else if(manage.home_mode == HOME_FLATNESS){
+      manage.start_flatness_measure();
+    }
+    else if(manage.home_mode == HOME_AUTO){
+#ifdef SHOW_BOTH_MODE
+      manage.start_clino_measure();
+      manage.start_flatness_measure();
+#else
+#ifdef JIAN_FA_MODE
+      if(manage.auto_mode_select == HOME_AUTO_SLOPE){
+        manage.start_clino_measure();
+        manage.start_flatness_measure();
+      }
+#else
+      if(manage.auto_mode_select == HOME_AUTO_SLOPE){
+      manage.start_clino_measure();
+      }
+#endif // JIAN_FA_MODE
+      else if(manage.auto_mode_select == HOME_AUTO_FLATNESS){
+      manage.start_flatness_measure();
+      }else{
+      manage.start_clino_measure();
+      manage.start_flatness_measure();
+      }
+#endif
+    }
+
+    *(pBLEState + 8) = *(pBLEState + 6);
+  }
+#else
   // process
   if (Press_Light && CanMeasure()) {
     if(manage.home_mode == HOME_ANGLE || manage.home_mode == HOME_SLOPE){
@@ -53,6 +90,7 @@ void Button::Update() {
 
     *(pBLEState + 8) = *(pBLEState + 6);
   }
+  #endif
   /* FSM */
   switch (manage.page) {
   /* HOME */
@@ -84,10 +122,39 @@ void Button::Update() {
         manage.page = PAGE_ZERO_MENU;
       }
       else if(Press_Power) {
-  #ifdef HARDWARE_2_0
-        manage.page = PAGE_ZERO_MENU;
-  #endif
-        if(manage.debug_sys_mode == 1)manage.page = PAGE_INFO;
+#ifdef DEVELOPER_MODE
+       manage.page = PAGE_INFO;
+#else
+        if(manage.home_mode == HOME_ANGLE || manage.home_mode == HOME_SLOPE){
+          manage.start_clino_measure();
+        }else if(manage.home_mode == HOME_FLATNESS){
+          manage.start_flatness_measure();
+        }
+        else if(manage.home_mode == HOME_AUTO){
+#ifdef SHOW_BOTH_MODE
+          manage.start_clino_measure();
+          manage.start_flatness_measure();
+#else
+#ifdef JIAN_FA_MODE
+          if(manage.auto_mode_select == HOME_AUTO_SLOPE){
+            manage.start_clino_measure();
+            manage.start_flatness_measure();
+          }
+#else
+          if(manage.auto_mode_select == HOME_AUTO_SLOPE){
+          manage.start_clino_measure();
+          }
+#endif // JIAN_FA_MODE
+          else if(manage.auto_mode_select == HOME_AUTO_FLATNESS){
+          manage.start_flatness_measure();
+          }else{
+          manage.start_clino_measure();
+          manage.start_flatness_measure();
+          }
+#endif
+        }
+        *(pBLEState + 8) = *(pBLEState + 6);
+#endif
       }
     break;
   /* BLE */
@@ -153,7 +220,7 @@ void Button::Update() {
           else if(Press_Enter && pIMU->yes_no)pIMU->cali_state = IMU_CALI_ZERO;
   #endif
       break;
-      case 1:
+      case IMU_CALI_ZERO:
           if(Press_Back){pIMU->StopCali();manage.page = PAGE_ZERO_MENU;}
           else if(Press_Power){pIMU->StopCali();manage.page = PAGE_ZERO_MENU;}
       break;
@@ -163,7 +230,6 @@ void Button::Update() {
         break;
       }
     break;
-  /* PAGE_ZERO_FLAT */
     case PAGE_ZERO_FLAT:
       switch (manage.flat.state) {
       case FLAT_FSM_DEFINE::FLAT_COMMON :
