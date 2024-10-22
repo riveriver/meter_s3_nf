@@ -20,7 +20,7 @@ void Button::Update() {
   bool Press_Enter = Press[4];
   bool Press_Light = Press[5];
 #ifdef JIAN_FA_MODE
-  if(manage.page == PAGE_ZERO_ANGLE && Press_Light && pIMU->yes_no){
+  if((manage.page == PAGE_ZERO_ANGLE || manage.page == PAGE_ZERO_FLAT) && Press_Light && pIMU->yes_no){
     pIMU->cali_state = IMU_CALI_ZERO;
   }
   else if(Press_Light && CanMeasure()) {
@@ -205,7 +205,7 @@ void Button::Update() {
       }
   #endif
     break;
-  /* PAGE_ZERO_ANGLE */
+    /* PAGE_ZERO_ANGLE */
     case PAGE_ZERO_ANGLE:
       switch (pIMU->cali_state) {
       case IMU_COMMON:
@@ -217,7 +217,7 @@ void Button::Update() {
   #else
           else if(Press_Back ){pIMU->StopCali();manage.page = PAGE_ZERO_MENU;}
           else if(Press_Enter && !pIMU->yes_no){pIMU->StopCali();manage.page = PAGE_ZERO_MENU;}
-          else if(Press_Enter && pIMU->yes_no)pIMU->cali_state = IMU_CALI_ZERO;
+          else if(Press_Enter && pIMU->yes_no){manage.zero_select = 0;pIMU->cali_state = IMU_CALI_ZERO;}
   #endif
       break;
       case IMU_CALI_ZERO:
@@ -231,6 +231,31 @@ void Button::Update() {
       }
     break;
     case PAGE_ZERO_FLAT:
+#ifdef JIAN_FA_MODE
+      switch (pIMU->cali_state) {
+      case IMU_COMMON:
+          if (Press_Up) pIMU->yes_no = false;
+          else if(Press_Down) pIMU->yes_no = true;
+  #ifdef HARDWARE_2_0 
+          else if(Press_Power && !pIMU->yes_no){pIMU->StopCali();manage.page = PAGE_ZERO_MENU;}
+          else if(Press_Power && pIMU->yes_no)pIMU->cali_state = IMU_CALI_ZERO;
+  #else
+          else if(Press_Back ){pIMU->StopCali();manage.page = PAGE_ZERO_MENU;}
+          else if(Press_Enter && !pIMU->yes_no){pIMU->StopCali();manage.page = PAGE_ZERO_MENU;}
+          else if(Press_Enter && pIMU->yes_no){manage.zero_select = 1; pIMU->cali_state = IMU_CALI_ZERO;}
+  #endif
+      break;
+      case IMU_CALI_ZERO:
+          if(Press_Back){pIMU->StopCali();manage.page = PAGE_ZERO_MENU;}
+          else if(Press_Power){pIMU->StopCali();manage.page = PAGE_ZERO_MENU;}
+      break;
+      default:
+          pIMU->cali_state = IMU_COMMON;
+          manage.page = PAGE_ZERO_MENU;
+        break;
+      }
+    break;
+#else
       switch (manage.flat.state) {
       case FLAT_FSM_DEFINE::FLAT_COMMON :
           if (Press_Up) pDS->yes_no = false;
@@ -251,6 +276,7 @@ void Button::Update() {
         break;
       }
     break;
+#endif
   /* PAGE_IMU_FACTORY_ZERO */
     case PAGE_IMU_FACTORY_ZERO:
       switch (pIMU->cali_state) {

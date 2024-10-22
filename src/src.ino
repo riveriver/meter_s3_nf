@@ -160,7 +160,8 @@ static void angle_measure_task(void *pvParameter) {
       case IMU_COMPLETE:
         imu.StopCali();
         ui.Block("Calibrate Complete", 2000);
-        manage.page = PAGE_HOME;
+        // HACK
+        manage.page = PAGE_INFO;
         manage.cursor = 0;
         break;
       case IMU_FACTORY_ZERO:

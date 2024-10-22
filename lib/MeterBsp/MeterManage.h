@@ -28,8 +28,10 @@ public:
   ClinoMeter  clino;
   float auto_angle = 0.0f;
   float test_angle = 0.0f;
+  float previous_angle = 0.0f;
   float slope_std = 2000.0f;
   float stable_error = 0;
+  float zero_select = 0;
   byte speed_mode  = SPEED_MODE_QUICK;
   /* flatness */
   FlatnessMeter flat;
@@ -101,7 +103,7 @@ byte meter_type = TYPE_2_0;
     warn_slope = pref.getFloat("WarnSlope",0);
     warn_flat = pref.getFloat("WarnFlat",0);
     sleep_time = pref.getInt("Sleep",15);
-    slope_std = pref.getFloat("SlopeStd",1000);
+    slope_std = pref.getFloat("SlopeStd",2000);
     pref.end();
     if (meter_type == METER_TYPE_DEFINE::TYPE_0_5) {
       local_name = "Ensightful_500_";
@@ -183,8 +185,10 @@ byte meter_type = TYPE_2_0;
     if (arrow == 1) {angle = fabs(angle);} 
     else if(arrow == 2){angle = -fabs(angle);}
     else{angle = fabs(angle);}
-    clino.angle_live = roundToZeroOrFive(angle,2);
-    clino.slope_live = ConvertToSlope(angle);
+    float filter_angle = 0;
+    LowPassFilter(angle,&previous_angle,&filter_angle);
+    clino.angle_live = roundToZeroOrFive(filter_angle,2);
+    clino.slope_live = round(ConvertToSlope(filter_angle));
     clino.arrow_live = arrow;
   }
 
@@ -350,6 +354,16 @@ void WarningLightFSM(){
   }
 }
 
+// ALPHA 越小，滤波效果越强，但响应速度会变慢；ALPHA 越大，滤波效果越弱，但响应速度会变快。
+// 常见的 ALPHA 值范围在0.01到0.1之间
+#define ALPHA 0.1
+void LowPassFilter(float input,float *previous,float *output){
+  // 应用一阶低通滤波器
+  *output = ALPHA * input + (1 - ALPHA) * (*previous);
+  // 更新上一次滤波后的角度
+  *previous = input;
+}
+
 float roundToZeroOrFive(float value,int bits) {
     float decimalPart = value - floor(value);  // 获取小数部分
     int bits_value = static_cast<int>(decimalPart * pow(10, bits) ) % 10;  // 获取小数点第二位数字
@@ -366,7 +380,25 @@ float roundToZeroOrFive(float value,int bits) {
     }
 }
 
-// HACK 
+float roundToZeroOrFive_S(float input) {
+    // 获取小数部分
+    int integerPart = (int)input;
+    float fractionalPart = input - integerPart;
+
+    // 将小数部分乘以10，取整
+    int fractionalDigit = (int)(fractionalPart * 10 + 0.5);
+
+    if (fractionalDigit < 3) {
+        // 小数位小于3，改为0
+        return (float)integerPart;
+    } else if (fractionalDigit > 8) {
+        // 小数位大于8，个位+1，小数位改为0
+        return (float)(integerPart + 1);
+    } else {
+        // 其余情况，小数位改为5
+        return (float)integerPart + 0.5;
+    }
+}
 float ConvertToSlope(float angle) {
   test_angle = angle;
   bool sign = (angle > 0);

@@ -71,6 +71,7 @@ private:
     void Sub_DrawSlope();
     void Sub_DrawFlat();
     void Sub_DrawFlatSlope();
+    void TestHome();
 public:  
     int *pBattry;
     uint8_t *pBLEState;

@@ -252,7 +252,7 @@ void IMU42688::QuickCalibrate() {
     // Check if the angle data already been load.
     if (!has_new_data)return;
     has_new_data = false;
-    byte avg_total = 20;
+    byte avg_total = 100;
 
     // Initialize the collection
     if (avg_count == 0)
@@ -270,29 +270,38 @@ void IMU42688::QuickCalibrate() {
         return;
     }
         // else, add the value to the buffer.
-    _sum_angle += angle_raw[1];
     avg_count++;
+    _sum_angle += angle_raw[1];
+    
 
- if (avg_count == avg_total){
-#ifdef JIAN_FA_MODE
-    pref.begin("Angle_Cal", false);
-    e[1] = 90 - _sum_angle / avg_total;
-    pref.putFloat("Ey", e[1]);
-    pref.end();
-#else
-    pref.begin("Angle_Cal", false);
-    e[1] = 0 - _sum_angle / avg_total;
-    pref.putFloat("Ey", e[1]);
-    pref.end();
-#endif
-    avg_count = 0;
-    _sum_angle = 0;
-    cali_state = IMU_COMPLETE;
-    String msg = "meter.angle.params.custom_zero:" + String(e[1], 2);
-    Serial.println(msg);
-    manage.angle_msg = msg;
-    return;
-  }
+    if (avg_count == avg_total){
+    #ifdef JIAN_FA_MODE
+        if(manage.zero_select == 1){
+          pref.begin("Angle_Cal", false);
+          e[1] = 90 - _sum_angle / avg_total;
+          pref.putFloat("Ey", e[1]);
+          pref.end();
+        }
+        else{
+          pref.begin("Angle_Cal", false);
+          e[1] = 0 - _sum_angle / avg_total;
+          pref.putFloat("Ey", e[1]);
+          pref.end();
+        }
+      #else
+          pref.begin("Angle_Cal", false);
+          e[1] = 0 - _sum_angle / avg_total;
+          pref.putFloat("Ey", e[1]);
+          pref.end();
+      #endif
+      avg_count = 0;
+      _sum_angle = 0;
+      cali_state = IMU_COMPLETE;
+      String msg = "meter.angle.params.custom_zero:" + String(e[1], 2);
+      Serial.println(msg);
+      manage.angle_msg = msg;
+      return;
+    }
     cali_progress = avg_count * 100.0 / avg_total;
 }
 

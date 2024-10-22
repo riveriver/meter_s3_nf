@@ -181,6 +181,31 @@ void MeterUI::Sub_DrawHome(){
     }
 }
 
+void MeterUI::TestHome() {
+String str = "";
+        str = "Slope:" + String(slope_show,2);
+        screen_h.drawStr(2, 8,str.c_str());
+        // 3 axis
+        str = "X:" + String(pIMU->angle_raw[0],2);
+        screen_h.drawStr(2,20, str.c_str());
+
+        str = "Y:" + String(pIMU->angle_raw[1],2);
+        screen_h.drawStr(2,34, str.c_str());
+
+        str = "Z:" + String(pIMU->angle_raw[2],2);
+        screen_h.drawStr(2,48, str.c_str());
+
+        str = "SE:" + String(manage.stable_error,5);
+        screen_h.drawStr(64, 20, str.c_str());
+
+        str = "Z0:" + String(pIMU->b[1],2);
+        screen_h.drawStr(64,48, str.c_str());
+
+        str = "Z1:" + String(pIMU->e[1],2);
+        screen_h.drawStr(64,62, str.c_str());
+}
+
+
 void MeterUI::Update() {
   // do block
   if(manage.ui_block_info != ""){
@@ -227,13 +252,13 @@ void MeterUI::Update() {
       break;
     case PAGE_ZERO_ANGLE:
       screen_s.setDisplayRotation(U8G2_R2);
-      screen_s.setFont(u8g2_font_7x14B_tr);
+      // screen_s.setFont(u8g2_font_7x14B_tr);
+      screen_s.setFont(u8g2_font_helvB08_tr);
       // YES_NO确认界面
       if (pIMU->cali_state == IMU_COMMON) {
         screen_s.drawStr(2, 15, "Standard 0 Ready?");
         char S1[4] = "No";
         char S2[4] = "Yes";
-        screen_s.setFont(u8g2_font_7x14B_tr);
         screen_s.drawFrame(41, 26, 46, 18);
         screen_s.drawFrame(41, 46, 46, 18);
         screen_s.drawStr(57, 40, S1);
@@ -244,13 +269,75 @@ void MeterUI::Update() {
       }
       // 采集数据页面
       else if (pIMU->cali_state == IMU_CALI_ZERO) {
-        screen_s.drawStr(2, 15, "Standard 0 Going!");
-        String str = "StableError: " + String(manage.stable_error,2);
-        screen_s.drawStr(2, 30, str.c_str());
+        screen_s.drawStr(2, 8, "Standard 0 Going!");
+        String str = "";
+        // 3 axis
+        str = "X:" + String(pIMU->angle_raw[0],2);
+        screen_s.drawStr(2,20, str.c_str());
+    
+        str = "Y:" + String(pIMU->angle_raw[1],2);
+        screen_s.drawStr(2,34, str.c_str());
+
+        str = "Z:" + String(pIMU->angle_raw[2],2);
+        screen_s.drawStr(2,48, str.c_str());
+        
+        str = "SE:" + String(manage.stable_error,5);
+        screen_s.drawStr(64, 20, str.c_str());
+
+        str = "Z0:" + String(pIMU->b[1],2);
+        screen_s.drawStr(64,34, str.c_str());
+
+        str = "Z1:" + String(pIMU->e[1],2);
+        screen_s.drawStr(64,48, str.c_str());
+        
         screen_s.drawFrame(12, 50, 104, 14);
         screen_s.drawBox(14, 52, pIMU->cali_progress, 10);
       }
       break;
+    // HACK
+    case PAGE_ZERO_FLAT:
+      screen_s.setDisplayRotation(U8G2_R2);
+      screen_s.setFont(u8g2_font_helvB08_tr);
+      // YES_NO确认界面
+      if (pIMU->cali_state == IMU_COMMON) {
+        screen_s.drawStr(2, 8, "Standard 90 Ready?");
+        char S1[4] = "No";
+        char S2[4] = "Yes";
+        screen_s.drawFrame(41, 26, 46, 18);
+        screen_s.drawFrame(41, 46, 46, 18);
+        screen_s.drawStr(57, 40, S1);
+        screen_s.drawStr(54, 60, S2);
+        screen_s.setDrawColor(2);
+        screen_s.drawBox(43, 28 + 20 * pIMU->yes_no, 42, 14);
+        screen_s.setDrawColor(1);
+      }
+      // 采集数据页面
+      else if (pIMU->cali_state == IMU_CALI_ZERO) {
+          screen_s.drawStr(2, 8, "Standard 90 Going!");
+          String str = "";
+          // 3 axis
+          str = "X:" + String(pIMU->angle_raw[0],2);
+          screen_s.drawStr(2,20, str.c_str());
+
+          str = "Y:" + String(pIMU->angle_raw[1],2);
+          screen_s.drawStr(2,34, str.c_str());
+
+          str = "Z:" + String(pIMU->angle_raw[2],2);
+          screen_s.drawStr(2,48, str.c_str());
+
+          str = "SE:" + String(manage.stable_error,5);
+          screen_s.drawStr(64, 20, str.c_str());
+
+          str = "Z0:" + String(pIMU->b[1],2);
+          screen_s.drawStr(64,34, str.c_str());
+
+          str = "Z1:" + String(pIMU->e[1],2);
+          screen_s.drawStr(64,48, str.c_str());
+          
+          screen_s.drawFrame(12, 50, 104, 14);
+          screen_s.drawBox(14, 52, pIMU->cali_progress, 10);
+        }
+        break;
     default:
       Flip();
       Sub_DrawHome();
@@ -258,11 +345,12 @@ void MeterUI::Update() {
   }
   screen_s.sendBuffer();
   screen_s.clearBuffer();
+  
   screen_h.setDisplayRotation(U8G2_R2);
-
   if (!hasSwitchHome()){
     switch (manage.page) {
       case PAGE_HOME:
+      // HACK
         if(g_this == 0 || g_this == 3)screen_h.setDisplayRotation(U8G2_R0);
         else if(g_this == 1) screen_h.setDisplayRotation(U8G2_R0);
         Primary_DrawHome();
@@ -379,6 +467,7 @@ void MeterUI::Primary_DrawArrow() {
   }
 }
 
+
 void MeterUI::Primary_DrawHome() {
   switch (manage.home_mode) {
     case 0:
@@ -410,7 +499,6 @@ void MeterUI::Primary_DrawAngle() {
 }
 
 void MeterUI::Primary_DrawSlope() {
-  // HACK
   // dtostrf(manage.test_angle, 6, 2, str_show);
   // drawNum_10x16(40, 2, str_show, 6);
   screen_h.drawXBM(106, 30, 17, 15, BITMAP_UNIT_MMM);
@@ -956,7 +1044,8 @@ void MeterUI::pageRobotCaliAngle() {
 void MeterUI::pageOptionYesNo(bool option) {
   char S1[4] = "No";
   char S2[4] = "Yes";
-  screen_h.setFont(u8g2_font_7x14B_tr);
+  // screen_h.setFont(u8g2_font_7x14B_tr);
+  screen_h.setFont(u8g2_font_helvB08_tr);
   screen_h.drawFrame(41, 26, 46, 18);
   screen_h.drawFrame(41, 46, 46, 18);
   screen_h.drawStr(57, 40, S1);
@@ -966,28 +1055,32 @@ void MeterUI::pageOptionYesNo(bool option) {
   screen_h.setDrawColor(1);
 }
 
-void MeterUI::pageCalAngleCheck() {
-  screen_h.setFont(u8g2_font_7x14B_tr);
+void MeterUI::pageImuFactoryZero() {
+  // screen_h.setFont(u8g2_font_7x14B_tr)
+  screen_h.setFont(u8g2_font_helvB08_tr);
   // YES_NO确认界面
   if (pIMU->cali_state == IMU_COMMON) {
-    screen_h.drawStr(2, 15, "Angle Cali Ready?");
+    screen_h.drawStr(2, 8, "Angle Factory Ready?");
     pageOptionYesNo(pIMU->yes_no);
   }
   // 采集数据页面
-  else if (pIMU->cali_state == IMU_CALI_ZERO) {
-    screen_h.drawStr(2, 15, "AngleCali Going!");
+  else if (pIMU->cali_state == IMU_FACTORY_ZERO) {
+    screen_h.drawStr(2, 8, "Angle Factory Going!");
     screen_h.drawFrame(12, 50, 104, 14);
     screen_h.drawBox(14, 52, pIMU->cali_progress, 10);
   }
+}
+
+void MeterUI::pageCalAngleCheck() {
 
   screen_h.setDisplayRotation(U8G2_R2);
-  screen_h.setFont(u8g2_font_7x14B_tr);
+  // screen_h.setFont(u8g2_font_7x14B_tr);
+  screen_h.setFont(u8g2_font_helvB08_tr);
   // YES_NO确认界面
   if (pIMU->cali_state == IMU_COMMON) {
-    screen_h.drawStr(2, 15, "Standard 0 Ready?");
+    screen_h.drawStr(2, 8, "Standard 0 Ready?");
     char S1[4] = "No";
     char S2[4] = "Yes";
-    screen_h.setFont(u8g2_font_7x14B_tr);
     screen_h.drawFrame(41, 26, 46, 18);
     screen_h.drawFrame(41, 46, 46, 18);
     screen_h.drawStr(57, 40, S1);
@@ -998,30 +1091,77 @@ void MeterUI::pageCalAngleCheck() {
   }
   // 采集数据页面
   else if (pIMU->cali_state == IMU_CALI_ZERO) {
-    screen_s.drawStr(2, 15, "Standard 0 Going!");
-    String str = "StableError: " + String(manage.stable_error,2);
-    screen_h.drawStr(2, 30, str.c_str());
-    screen_h.drawFrame(12, 50, 104, 14);
-    screen_h.drawBox(14, 52, pIMU->cali_progress, 10);
-  }
-}
+    screen_h.drawStr(2, 8, "Standard 0 Going!");
+    String str = "";
+    // 3 axis
+    str = "X:" + String(pIMU->angle_raw[0],2);
+    screen_h.drawStr(2,20, str.c_str());
 
-void MeterUI::pageImuFactoryZero() {
-  screen_h.setFont(u8g2_font_7x14B_tr);
-  // YES_NO确认界面
-  if (pIMU->cali_state == IMU_COMMON) {
-    screen_h.drawStr(2, 15, "Angle Factory Ready?");
-    pageOptionYesNo(pIMU->yes_no);
-  }
-  // 采集数据页面
-  else if (pIMU->cali_state == IMU_FACTORY_ZERO) {
-    screen_h.drawStr(2, 15, "Angle Factory Going!");
+    str = "Y:" + String(pIMU->angle_raw[1],2);
+    screen_h.drawStr(2,34, str.c_str());
+
+    str = "Z:" + String(pIMU->angle_raw[2],2);
+    screen_h.drawStr(2,48, str.c_str());
+
+    str = "SE:" + String(manage.stable_error,5);
+    screen_h.drawStr(64, 20, str.c_str());
+
+    str = "Z0:" + String(pIMU->b[1],2);
+    screen_h.drawStr(64,48, str.c_str());
+
+    str = "Z1:" + String(pIMU->e[1],2);
+    screen_h.drawStr(64,62, str.c_str());
+    
     screen_h.drawFrame(12, 50, 104, 14);
     screen_h.drawBox(14, 52, pIMU->cali_progress, 10);
   }
 }
 
 void MeterUI::pageCaliFlatCheck() {
+#ifdef JIAN_FA_MODE
+  screen_h.setDisplayRotation(U8G2_R2);
+  // screen_h.setFont(u8g2_font_7x14B_tr);
+  screen_h.setFont(u8g2_font_helvB08_tr);
+  // YES_NO确认界面
+  if (pIMU->cali_state == IMU_COMMON) {
+    screen_h.drawStr(2, 8, "Standard 90 Ready?");
+    char S1[4] = "No";
+    char S2[4] = "Yes";
+    screen_h.drawFrame(41, 26, 46, 18);
+    screen_h.drawFrame(41, 46, 46, 18);
+    screen_h.drawStr(57, 40, S1);
+    screen_h.drawStr(54, 60, S2);
+    screen_h.setDrawColor(2);
+    screen_h.drawBox(43, 28 + 20 * pIMU->yes_no, 42, 14);
+    screen_h.setDrawColor(1);
+  }
+  // 采集数据页面
+  else if (pIMU->cali_state == IMU_CALI_ZERO) {
+    screen_h.drawStr(2, 8, "Standard 90 Going!");
+    String str = "";
+    // 3 axis
+    str = "X:" + String(pIMU->angle_raw[0],2);
+    screen_h.drawStr(2,20, str.c_str());
+
+    str = "Y:" + String(pIMU->angle_raw[1],2);
+    screen_h.drawStr(2,34, str.c_str());
+
+    str = "Z:" + String(pIMU->angle_raw[2],2);
+    screen_h.drawStr(2,48, str.c_str());
+
+    str = "SE:" + String(manage.stable_error,5);
+    screen_h.drawStr(64, 20, str.c_str());
+
+    str = "Z0:" + String(pIMU->b[1],2);
+    screen_h.drawStr(64,34, str.c_str());
+
+    str = "Z1:" + String(pIMU->e[1],2);
+    screen_h.drawStr(64,48, str.c_str());
+    
+    screen_h.drawFrame(12, 50, 104, 14);
+    screen_h.drawBox(14, 52, pIMU->cali_progress, 10);
+  }
+#else
   screen_h.setFont(u8g2_font_helvB08_tr);
   // YES_NO确认界面
   if (manage.flat.state == FLAT_COMMON) {
@@ -1045,32 +1185,33 @@ void MeterUI::pageCaliFlatCheck() {
         screen_h.drawStr(x_offset, y_offset, str.c_str());
       }
   }
+#endif
 }
 
 void MeterUI::pageResetFactoryZero() {
-  screen_h.setFont(u8g2_font_7x14B_tr);
+  screen_h.setFont(u8g2_font_helvB08_tr);
   if (manage.reset_state == 0) {
-    screen_h.drawStr(2, 15, "Reset Factory Ready?");
+    screen_h.drawStr(2, 8, "Reset Factory Ready?");
     pageOptionYesNo(manage.ui_yes_no);
   }
   // 采集数据页面
   else if (manage.reset_state == 1) {
-    screen_h.drawStr(2, 15, "Reset Factory Going!");
+    screen_h.drawStr(2, 8, "Reset Factory Going!");
     screen_h.drawFrame(12, 50, 104, 14);
     screen_h.drawBox(14, 52, manage.ui_progress, 10);
   }
 }
 
 void MeterUI::pageFlatFactoryZero() {
-  screen_h.setFont(u8g2_font_7x14B_tr);
+  screen_h.setFont(u8g2_font_helvB08_tr);
   // YES_NO确认界面
   if (manage.flat.state == FLAT_COMMON) {
-    screen_h.drawStr(2, 15, "Flat Factory Ready?");
+    screen_h.drawStr(2, 8, "Flat Factory Ready?");
     pageOptionYesNo(pDS->yes_no);
   }
   // 采集数据页面
   else if (manage.flat.state == FLAT_FACTORY_ZERO) {
-    screen_h.drawStr(2, 15, "Flat Factory Going!");
+    screen_h.drawStr(2, 8, "Flat Factory Going!");
     screen_h.drawFrame(12, 50, 104, 14);
     screen_h.drawBox(14, 52, pDS->cali_progress, 10);
   }
@@ -1082,7 +1223,7 @@ void MeterUI::pageInfo(int selection) {
   byte sensor_num = 0; 
   String str = "";
   switch (selection) {
-    case 0:
+    case 4:
       str = String(manage.local_name);
       screen_h.drawStr( 2,8,str.c_str());
 
@@ -1127,7 +1268,7 @@ void MeterUI::pageInfo(int selection) {
                          String(pDS->raw_peak[i], 0).c_str());
       }
       break;
-    case 4:
+    case 0:
         pageImuInfo();
       break;
     case 5:
@@ -1170,6 +1311,9 @@ void MeterUI::pageImuInfo() {
   String str = "";
   screen_h.drawStr(2, 8, "IMU_INFO");
 
+  str = "S:" + String(slope_show,2);
+  screen_h.drawStr(64,8, str.c_str());
+  
   str = "U:" + String(pIMU->angle_user[1],2);
   screen_h.drawStr(2,20, str.c_str());
 
