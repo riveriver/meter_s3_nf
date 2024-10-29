@@ -69,7 +69,6 @@ void Flatness::init() {
   String str = "[ads_init]";
   for(int i = 0;i < ADS_NUM; i++){
     p_wire = i < 2 ? &wire_host : &wire_sub;
-    // HACK
     int addr = 0x48 + i;
     p_wire->beginTransmission(addr);
     if (HandleError_Wire(p_wire->endTransmission(), addr) == true) {

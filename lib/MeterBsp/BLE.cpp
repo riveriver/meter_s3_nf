@@ -1,7 +1,8 @@
 #include "BLE.h"
 
-BLE ble;
-void BLE::Init() {
+extern BLE_COMM ble;
+extern Meter manage;
+void BLE_COMM::Init() {
   // Start BLE Deviec ----------------------------------------
   BLEDevice::init("Ensightful_"); 
   String mac_addr = BLEDevice::getAddress().toString().c_str();
@@ -101,32 +102,32 @@ void BLE::Init() {
   slow_sync = millis();
 }
 
-void BLE::SendAngle(float SendFloat) {
+void BLE_COMM::SendAngle(float SendFloat) {
   AngleChar->setValue(SendFloat);
   AngleChar->notify(true);
 }
 
-void BLE::SendSlope(float SendFloat) {
+void BLE_COMM::SendSlope(float SendFloat) {
   SlopeChar->setValue(SendFloat);
   SlopeChar->notify(true);
 }
 
-void BLE::SendFlatness(float SendFloat) {
+void BLE_COMM::SendFlatness(float SendFloat) {
   FlatChar->setValue(SendFloat);
   FlatChar->notify(true);
 }
 
-void BLE::SendStatus(byte *Send) {
+void BLE_COMM::SendStatus(byte *Send) {
   StatusChar->setValue(*Send);
   StatusChar->notify(true);
 }
 
-void BLE::SendHome(byte *Send) {
+void BLE_COMM::SendHome(byte *Send) {
   ControlChar->setValue((*Send) + HOME_MODE_BASE * 1000);
   ControlChar->notify(true);
 }
 
-void BLE::DoSwitch() {
+void BLE_COMM::DoSwitch() {
   // Do nothing if is_advertising status remain the same.
   if (pre_ble_state == state.is_advertising) return;
   // If swich from off to on;
@@ -146,7 +147,7 @@ void BLE::DoSwitch() {
   pre_ble_state = ble.state.is_advertising;
 };
 
-void BLE::sendSyncInfo() {
+void BLE_COMM::sendSyncInfo() {
   // version_info
   int soft_ver = manage.version_software + VERSION_SOFTWARE_BASE * 1000;
   int hard_ver = manage.version_hardware + VERSION_HARDWARE_BASE * 1000;
@@ -167,7 +168,11 @@ void BLE::sendSyncInfo() {
 
 }
 
-void BLE::QuickNotifyEvent() {
+void BLE_COMM::sendControlInfo(int data) {
+  ControlChar->setValue(data);
+  ControlChar->notify(true);
+}
+void BLE_COMM::QuickNotifyEvent() {
 
   // send measure status to app
   SendStatus(&manage.measure.state);
@@ -183,6 +188,13 @@ void BLE::QuickNotifyEvent() {
     manage.ack_msg = "";
   }
 
+  if (manage.a_state != 0)
+  {
+    ControlChar->setValue(manage.a_state);
+    ControlChar->notify(true);
+    manage.a_state = 0;
+  }
+  
   if (manage.angle_msg != "") {
     DeveloperChar->setValue(manage.angle_msg);
     DeveloperChar->notify(true);
@@ -196,12 +208,12 @@ void BLE::QuickNotifyEvent() {
   }
 }
 
-void BLE::SlowNotifyEvent() {
+void BLE_COMM::SlowNotifyEvent() {
     ControlChar->setValue(manage.battery);
     ControlChar->notify(true);
 }
 
-void BLE::parseDeveloperInfo(int info) {
+void BLE_COMM::parseDeveloperInfo(int info) {
   uint8_t cmd = info / 1000;
   uint8_t huns = (info / 100) % 10;
   uint8_t tens = (info / 10) % 10;
@@ -212,7 +224,13 @@ void BLE::parseDeveloperInfo(int info) {
       manage.page = data;
       break;
     case 1:
-      ParseDebugMode(huns, data);
+      if(data == 1){
+        manage.app_zero = data;
+      }else if(data == 2){
+        manage.app_zero = data;
+      }else{
+        ESP_LOGE("AppDeveloper", "unknown action:%d", data);
+      }
       break;
     case 7:
       ParseAngleCaliCmd(info);
@@ -226,7 +244,7 @@ void BLE::parseDeveloperInfo(int info) {
   }
 }
 
-void BLE::ParseAngleCaliCmd(int info) {
+void BLE_COMM::ParseAngleCaliCmd(int info) {
   manage.page = PAGE_CALI_ANGLE;
   String dataString;
   dataString = "";
@@ -237,7 +255,7 @@ void BLE::ParseAngleCaliCmd(int info) {
   Serial1.print(dataString);
 }
 
-void BLE::ParseFlatCaliCmd(int info) {
+void BLE_COMM::ParseFlatCaliCmd(int info) {
   manage.page = PAGE_CALI_FLAT;
   uint8_t huns = (info / 100) % 10;
   uint8_t tens = (info / 10) % 10;
@@ -261,7 +279,7 @@ void BLE::ParseFlatCaliCmd(int info) {
   }
 }
 
-void BLE::ParseDebugMode(byte part, byte data) {
+void BLE_COMM::ParseDebugMode(byte part, byte data) {
   switch (part) {
     case 2:
       manage.debug_flat_mode = data;
@@ -272,12 +290,15 @@ void BLE::ParseDebugMode(byte part, byte data) {
   }
 }
 
-void BLE::parseSyncInfo(int info) {
+void BLE_COMM::parseSyncInfo(int info) {
   uint8_t cmd = info / 1000;
   uint8_t huns = (info / 100) % 10;
   uint8_t tens = (info / 10) % 10;
   uint8_t ones = (info) % 10;
   switch (cmd) {
+    case ACTION_BASE:
+      Serial.println("rx action:" + String(ones));
+      break;
     case HOME_MODE_BASE:
       manage.home_mode = ones;
       break;

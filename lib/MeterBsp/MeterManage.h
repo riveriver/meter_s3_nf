@@ -14,10 +14,12 @@
 #include <Preferences.h>
 #include "MeterDefine.h"
 #include "SLED.h"
+// #include "BLE.h"
 
 class Meter{
 private:
 public:
+  // BLE_COMM *pBLE;
   byte debug_sys_mode = 0;
   byte debug_flat_mode = 0;
   String local_name = "Ensightful";
@@ -32,6 +34,7 @@ public:
   float slope_std = 2000.0f;
   float stable_error = 0;
   float zero_select = 0;
+  float app_zero = 0;
   byte speed_mode  = SPEED_MODE_QUICK;
   /* flatness */
   FlatnessMeter flat;
@@ -56,7 +59,6 @@ public:
   byte reset_state = 0; // 0:normal, 1:reset, 2:reset_done
   int  block_time;
   bool ui_yes_no = false;
-  // HACK
   byte ui_progress = 0;
   bool has_home_change = false;
   bool has_ble_switch = false;
@@ -72,6 +74,7 @@ byte meter_type = TYPE_2_0;
   int battery = 0;
   int  sleep_time = 15; 
   /* msg */
+  int  a_state = 0;
   String  angle_msg = "";
   String  flatness_msg = "";
   String  ack_msg = "";
@@ -185,10 +188,9 @@ byte meter_type = TYPE_2_0;
     if (arrow == 1) {angle = fabs(angle);} 
     else if(arrow == 2){angle = -fabs(angle);}
     else{angle = fabs(angle);}
-    float filter_angle = 0;
-    LowPassFilter(angle,&previous_angle,&filter_angle);
-    clino.angle_live = roundToZeroOrFive(filter_angle,2);
-    clino.slope_live = round(ConvertToSlope(filter_angle));
+    // LowPassFilter(angle,&previous_angle,&filter_angle);
+    clino.angle_live = roundToZeroOrFive(angle,2);
+    clino.slope_live = round(ConvertToSlope(angle));
     clino.arrow_live = arrow;
   }
 
@@ -197,7 +199,7 @@ byte meter_type = TYPE_2_0;
     else if(arrow == 2){angle = -fabs(angle);}
     else{angle = fabs(angle);}
     clino.angle_hold = roundToZeroOrFive(angle,2);
-    clino.slope_hold = ConvertToSlope(angle);
+    clino.slope_hold = round(ConvertToSlope(angle));
     clino.arrow_hold = arrow;
   }
 

@@ -68,9 +68,6 @@ void IMU42688::unpackFromC3(unsigned char info){
         break;
       case STEP_PRASE_CALI:
           if(info == '>'){
-              String msg = String(cali_rx_buffer, cali_rx_index);
-              Serial.println(msg);
-              manage.angle_msg = msg;
               cali_rx_index = 0;
               unpack_step = STEP_FRAME_HEAD;
           }else{
@@ -167,7 +164,6 @@ uint8_t IMU42688::Update() {
       AngleCope[i - 1] = info_parsed[i];
     }
     // 3. Update angle data
-    // HACK
     memmove(&angle_raw[0], &AngleCope[0], sizeof(angle_raw));
     memmove(&angle_raw_show[0], &AngleCope[0], sizeof(angle_raw_show));
 
@@ -276,17 +272,20 @@ void IMU42688::QuickCalibrate() {
 
     if (avg_count == avg_total){
     #ifdef JIAN_FA_MODE
-        if(manage.zero_select == 1){
+        if(manage.zero_select == 2){
           pref.begin("Angle_Cal", false);
           e[1] = 90 - _sum_angle / avg_total;
           pref.putFloat("Ey", e[1]);
           pref.end();
         }
-        else{
+        else if(manage.zero_select == 1){
           pref.begin("Angle_Cal", false);
           e[1] = 0 - _sum_angle / avg_total;
           pref.putFloat("Ey", e[1]);
           pref.end();
+        }
+        else{
+          Serial.println("unknown zero select:" + String(manage.zero_select));
         }
       #else
           pref.begin("Angle_Cal", false);
@@ -297,12 +296,19 @@ void IMU42688::QuickCalibrate() {
       avg_count = 0;
       _sum_angle = 0;
       cali_state = IMU_COMPLETE;
-      String msg = "meter.angle.params.custom_zero:" + String(e[1], 2);
-      Serial.println(msg);
-      manage.angle_msg = msg;
+      manage.zero_select = 0;
+      // HACK: 1102 is the code for "Calibrate Complete" in the app
+      // String msg = String(1102);
+      // manage.angle_msg = msg;
+      manage.a_state = 1102;
       return;
     }
     cali_progress = avg_count * 100.0 / avg_total;
+    // String msg = String(1101);
+    // manage.angle_msg = msg;
+    if(manage.a_state == 0)manage.a_state = 1101;
+    // pBLE->ControlChar->setValue(1101);
+    // pBLE->ControlChar->notify(true);
 }
 
 void IMU42688::CaliFactoryZero() {
@@ -342,9 +348,6 @@ void IMU42688::CaliFactoryZero() {
     avg_count = 0;
     _sum_angle = 0;
     cali_state = IMU_COMPLETE;
-    String msg = "meter.angle.params.factory_zero " + String(e[1], 2);
-    Serial.println(msg);
-    manage.angle_msg = msg;
     return;
   }
     cali_progress = avg_count * 100.0 / avg_total;
@@ -365,7 +368,6 @@ void IMU42688::onMeasureReset() {
 }
 
 void IMU42688::setParam(uint8_t mode) {
-  // HACK measure_total 过小会不会导致未稳定下来就测量
   switch (mode) {
     case SPEED_MODE_STANDARD:
       measure_total = 20;

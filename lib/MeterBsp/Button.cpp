@@ -2,7 +2,7 @@
 
 void Button::Update() {
   // check
-  // HACK 经常导致两次才能达成目的
+  // TODO 经常导致两次才能达成目的
   // if (!Press_Power && !Press_Up && !Press_Down && !Press_Back && !Press_Enter && !Press_Light) {
   //   return;
   // }
@@ -52,7 +52,6 @@ void Button::Update() {
       }
 #endif
     }
-
     *(pBLEState + 8) = *(pBLEState + 6);
   }
 #else
@@ -217,7 +216,7 @@ void Button::Update() {
   #else
           else if(Press_Back ){pIMU->StopCali();manage.page = PAGE_ZERO_MENU;}
           else if(Press_Enter && !pIMU->yes_no){pIMU->StopCali();manage.page = PAGE_ZERO_MENU;}
-          else if(Press_Enter && pIMU->yes_no){manage.zero_select = 0;pIMU->cali_state = IMU_CALI_ZERO;}
+          else if(Press_Enter && pIMU->yes_no){manage.zero_select = 1;pIMU->cali_state = IMU_CALI_ZERO;}
   #endif
       break;
       case IMU_CALI_ZERO:
@@ -226,7 +225,7 @@ void Button::Update() {
       break;
       default:
           pIMU->cali_state = IMU_COMMON;
-          manage.page = PAGE_ZERO_MENU;
+          manage.page = PAGE_HOME;
         break;
       }
     break;
@@ -242,7 +241,7 @@ void Button::Update() {
   #else
           else if(Press_Back ){pIMU->StopCali();manage.page = PAGE_ZERO_MENU;}
           else if(Press_Enter && !pIMU->yes_no){pIMU->StopCali();manage.page = PAGE_ZERO_MENU;}
-          else if(Press_Enter && pIMU->yes_no){manage.zero_select = 1; pIMU->cali_state = IMU_CALI_ZERO;}
+          else if(Press_Enter && pIMU->yes_no){manage.zero_select = 2; pIMU->cali_state = IMU_CALI_ZERO;}
   #endif
       break;
       case IMU_CALI_ZERO:

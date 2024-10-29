@@ -135,6 +135,7 @@ struct FlatnessMeter{
 enum BLE_COM_DEFINE{
 
   BATTERY_BASE = 0,//电量，小于1000的值就是电量
+  ACTION_BASE = 1,
   METER_TYPE_BASE = 2,//靠尺类型
   METER_TYPE_500 = 2001,
   METER_TYPE_600 = 2002,

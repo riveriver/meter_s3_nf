@@ -12,7 +12,7 @@
 #include "CmdParser.h"
 #include "BLE.h"
 #include "CommProtocol.h"
-extern BLE ble;
+BLE_COMM ble;
 StringCmdParser cmd_parser(" ");
 Meter manage;
 Flatness flat;
@@ -32,6 +32,7 @@ TaskHandle_t *firmware_handle;
 void setup() {
   on_off.On(IO_Button0, IO_EN, manage.led, ui);
   ui.TurnOn();
+  // manage.pBLE = &ble;
   imu.init(IO_IMU_RX, IO_IMU_TX);
   flat.init();
   Bat.SetPin(IO_Battery);
@@ -152,6 +153,12 @@ static void angle_measure_task(void *pvParameter) {
   while(1) {
     /* imu update */
     if (imu.Update() == true) {
+      if(manage.app_zero != 0){
+        manage.zero_select = manage.app_zero; 
+        imu.cali_state = IMU_CALI_ZERO;
+        manage.page = PAGE_ZERO_FLAT;
+        manage.app_zero = 0;
+      }
       switch (imu.cali_state)
       {
       case IMU_CALI_ZERO:
@@ -159,10 +166,9 @@ static void angle_measure_task(void *pvParameter) {
         break;
       case IMU_COMPLETE:
         imu.StopCali();
-        ui.Block("Calibrate Complete", 2000);
-        // HACK
-        manage.page = PAGE_INFO;
+        manage.page = PAGE_HOME;
         manage.cursor = 0;
+        ui.Block("Calibrate Complete", 2000);
         break;
       case IMU_FACTORY_ZERO:
         imu.CaliFactoryZero();

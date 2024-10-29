@@ -294,7 +294,6 @@ void MeterUI::Update() {
         screen_s.drawBox(14, 52, pIMU->cali_progress, 10);
       }
       break;
-    // HACK
     case PAGE_ZERO_FLAT:
       screen_s.setDisplayRotation(U8G2_R2);
       screen_s.setFont(u8g2_font_helvB08_tr);
@@ -350,7 +349,6 @@ void MeterUI::Update() {
   if (!hasSwitchHome()){
     switch (manage.page) {
       case PAGE_HOME:
-      // HACK
         if(g_this == 0 || g_this == 3)screen_h.setDisplayRotation(U8G2_R0);
         else if(g_this == 1) screen_h.setDisplayRotation(U8G2_R0);
         Primary_DrawHome();
@@ -402,7 +400,6 @@ void MeterUI::Update() {
 void MeterUI::Primary_DrawCommon() {
   screen_h.drawXBM(18, 2, 17, 9, BITMAP_BATTERY);
   screen_h.drawBox(21, 4, *pBattry * 12 / 100, 5);
-  // HACK
   if (*(pBLEState + 6) == true) {
     screen_h.drawXBM(39, 2, 13, 12, bitmap_bluetooth);
   }

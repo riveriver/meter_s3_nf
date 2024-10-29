@@ -3,6 +3,7 @@
 #include <vector>
 #include <sstream>
 #include "MeterManage.h"
+
 extern Meter manage;
 /* example
 int cmd_print_test(size_t argc, const std::vector<std::string>& argv) {

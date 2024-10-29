@@ -6,7 +6,7 @@
 #include "MeterManage.h"
 #include "Flatness.h"
 
-extern Meter manage;
+
 
 struct BLEState {
   uint8_t addr[6];        /** @brief BLE advertising address.*/
@@ -34,7 +34,7 @@ class DeveloperCallbacks : public BLECharacteristicCallbacks {
   void onWrite(NimBLECharacteristic *pCharacteristic);
 };
 
-class BLE {
+class BLE_COMM {
  public:
   BLEState state;
   void Init();
@@ -53,6 +53,7 @@ class BLE {
   void ParseDebugMode(byte part,byte data);
   void ParseFlatCaliCmd(int info);
   void SlowNotifyEvent();
+  void sendControlInfo(int data);
 
  private:
   bool DEBUG = 0;
